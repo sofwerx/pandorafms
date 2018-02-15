@@ -52,11 +52,6 @@ function config_update_value ($token, $value) {
 			io_safe_output($value));
 	}
 	
-	if ($token == 'ad_adv_perms') {
-		$value = str_replace(array("\r\n", "\r", "\n"), ";",
-			io_safe_output($value));
-	}
-	
 	if ($token == 'default_assign_tags') {
 		$value = ($value);
 	}
@@ -141,8 +136,12 @@ function config_update_config () {
 						$error_update[] = __('Time source');
 					if (!config_update_value ('autoupdate', (bool) get_parameter ('autoupdate')))
 						$error_update[] = __('Automatic check for updates');
+					if (!config_update_value ('cert_path', (bool) get_parameter ('cert_path')))
+						$error_update[] = __('SSL cert path');
 					if (!config_update_value ('https', (bool) get_parameter ('https')))
 						$error_update[] = __('Enforce https');
+					if (!config_update_value ('use_cert', (bool) get_parameter ('use_cert')))
+						$error_update[] = __('Use cert.');
 					if (!config_update_value ('attachment_store', (string) get_parameter ('attachment_store')))
 						$error_update[] = __('Attachment store');
 					if (!config_update_value ('list_ACL_IPs_for_API', (string) get_parameter('list_ACL_IPs_for_API')))
@@ -203,6 +202,10 @@ function config_update_config () {
 						$error_update[] = __('Limit parameters massive');
 					if (!config_update_value ('identification_reminder', get_parameter('identification_reminder')))
 						$error_update[] = __('Identification_reminder');
+					if (!config_update_value ('include_agents', (bool)get_parameter('include_agents')))
+						$error_update[] = __('Include_agents');
+					if (!config_update_value ('auditdir', get_parameter('auditdir')))
+						$error_update[] = __('Audit log directory');
 					break;
 				case 'enterprise':
 					if (isset($config['enterprise_installed']) && $config['enterprise_installed'] == 1) {
@@ -350,6 +353,8 @@ function config_update_config () {
 						$error_update[] = __('User');
 					if (!config_update_value ('rintegria_pass', io_input_password(get_parameter ('rintegria_pass'))))
 						$error_update[] = __('Password');
+					if (!config_update_value ('saml_path', get_parameter ('saml_path')))
+						$error_update[] = __('Saml path');
 					if (!config_update_value ('double_auth_enabled', get_parameter ('double_auth_enabled')))
 						$error_update[] = __('Double authentication');
 					if (!config_update_value ('session_timeout', get_parameter ('session_timeout')))
@@ -427,6 +432,8 @@ function config_update_config () {
 						$error_update[] = __('Graphic resolution (1-low, 5-high)');
 					if (!config_update_value ('interface_unit', (string) get_parameter ('interface_unit', __('Bytes') )))
 						$error_update[] = __('Value to interface graphics');
+					if (!config_update_value ('graph_precision', (string) get_parameter ('graph_precision', 1)))
+						$error_update[] = __('Data precision for reports');
 					$style = (string) get_parameter ('style');
 					if ($style != $config['style'])
 						$style = substr ($style, 0, strlen ($style) - 4);
@@ -446,8 +453,15 @@ function config_update_config () {
 						$error_update[] = __('Font size');
 					if (!config_update_value ('flash_charts', (bool) get_parameter ('flash_charts')))
 						$error_update[] = __('Interactive charts');
-					if (!config_update_value ('custom_logo', (string) get_parameter ('custom_logo')))
-						$error_update[] = __('Custom logo');
+					
+						
+						if (!config_update_value ('custom_logo', (string) get_parameter ('custom_logo')))
+							$error_update[] = __('Custom logo');
+							if (!config_update_value ('custom_logo_login', (string) get_parameter ('custom_logo_login')))
+							$error_update[] = __('Custom logo login');
+	
+						
+						
 					if (!config_update_value ('login_background', (string) get_parameter ('login_background')))
 						$error_update[] = __('Login background');
 					if (!config_update_value ('vc_refr', get_parameter('vc_refr')))
@@ -472,6 +486,8 @@ function config_update_config () {
 						$error_update[] = __('Default icon in GIS');
 					if (!config_update_value ('autohidden_menu', get_parameter('autohidden_menu')))
 						$error_update[] = __('Autohidden menu');
+					if (!config_update_value ('fixed_graph', get_parameter('fixed_graph')))
+							$error_update[] = __('Fixed graph');
 					if (!config_update_value ('fixed_header', get_parameter('fixed_header')))
 						$error_update[] = __('Fixed header');
 					if (!config_update_value ('fixed_menu', get_parameter('fixed_menu')))
@@ -490,6 +506,10 @@ function config_update_config () {
 						$error_update[] = __('Default line thickness for the Custom Graph.');
 					if (!config_update_value ('type_module_charts', (string) get_parameter('type_module_charts', 'area')))
 						$error_update[] = __('Default type of module charts.');
+					if (!config_update_value ('type_interface_charts', (string) get_parameter('type_interface_charts', 'line')))
+						$error_update[] = __('Default type of interface charts.');
+					if (!config_update_value ('only_average', (bool) get_parameter('only_average', false)))
+						$error_update[] = __('Default show only average or min and max');
 					if (!config_update_value ('render_proc', (bool) get_parameter('render_proc', false)))
 						$error_update[] = __('Display data of proc modules in other format');
 					if (!config_update_value ('render_proc_ok', (string) get_parameter('render_proc_ok', __('Ok') )))
@@ -624,6 +644,8 @@ function config_update_config () {
 			case 'hist_db':
 				if (!config_update_value ('history_db_enabled', get_parameter ('history_db_enabled')))
 					$error_update[] = __('Enable history database');
+				if (!config_update_value ('history_event_enabled', get_parameter ('history_event_enabled')))
+					$error_update[] = __('Enable history event');
 				if (!config_update_value ('history_db_host', get_parameter ('history_db_host')))
 					$error_update[] = __('Host');
 				if (!config_update_value ('history_db_port', get_parameter ('history_db_port')))
@@ -636,6 +658,8 @@ function config_update_config () {
 					$error_update[] = __('Database password');
 				if (!config_update_value ('history_db_days', get_parameter ('history_db_days')))
 					$error_update[] = __('Days');
+				if (!config_update_value ('history_event_days', get_parameter ('history_event_days')))
+					$error_update[] = __('Event Days');
 				if (!config_update_value ('history_db_step', get_parameter ('history_db_step')))
 					$error_update[] = __('Step');
 				if (!config_update_value ('history_db_delay', get_parameter ('history_db_delay')))
@@ -758,6 +782,14 @@ function config_process_config () {
 		// Sets whether or not we want to enforce https. We don't want to go to a
 		// potentially unexisting config by default
 		config_update_value ('https', false);
+	}
+	if (!isset ($config["use_cert"])) {
+		config_update_value ('use_cert', false);
+	}
+	
+	if (!isset ($config['cert_path'])) {
+		// Sets name and path of ssl path for use in application
+		config_update_value ('cert_path', '/etc/ssl/certs/pandorafms.pem');
 	}
 	
 	if (!isset ($config["num_files_attachment"])) {
@@ -887,7 +919,13 @@ function config_process_config () {
 	if (!isset ($config["log_collector"])) {
 		config_update_value ('log_collector', 0);
 	}
-	
+	if (!isset ($config["include_agents"])) {
+		config_update_value ('include_agents', 0);
+	}
+
+	if (!isset ($config["auditdir"])) {
+		config_update_value ('auditdir',"/var/www/html/pandora_console");
+	}
 	if (!isset ($config["log_dir"])) {
 		if ($is_windows)
 			$default = 'C:\\PandoraFMS\\Pandora_Server\\data_in\\log';
@@ -955,8 +993,9 @@ function config_process_config () {
 	
 	
 	if (!isset ($config['fontpath'])) {
+		$home = str_replace('\\', '/', $config['homedir'] );
 		config_update_value('fontpath',
-			$config['homedir'] . '/include/fonts/smallfont.ttf');
+			$home . '/include/fonts/smallfont.ttf');
 	}
 	
 	if (!isset ($config['style'])) {
@@ -983,16 +1022,31 @@ function config_process_config () {
 		config_update_value ('fixed_header', false);
 	}
 	
+	if (!isset ($config["fixed_graph"])) {
+		config_update_value ('fixed_graph', false);
+	}
+	
 	if (!isset ($config["fixed_menu"])) {
 		config_update_value ('fixed_menu', false);
 	}
 	
+
+	
 	if (!isset ($config["custom_logo"])) {
-		config_update_value ('custom_logo', 'pandora_logo_head.png');
+		config_update_value ('custom_logo', 'pandora_logo_head_4.png');
+
 	}
+	if (!isset ($config["custom_logo_login"])) {
+		config_update_value ('custom_logo_login', 'login_logo.png');
+	}
+	
 	
 	if (!isset ($config['history_db_enabled'])) {
 		config_update_value ( 'history_db_enabled', false);
+	}
+	
+	if (!isset ($config['history_event_enabled'])) {
+		config_update_value ( 'history_event_enabled', false);
 	}
 	
 	if (!isset ($config['history_db_host'])) {
@@ -1017,6 +1071,10 @@ function config_process_config () {
 	
 	if (!isset ($config['history_db_days'])) {
 		config_update_value ( 'history_db_days', 0);
+	}
+	
+	if (!isset ($config['history_event_days'])) {
+		config_update_value ('history_event_days', 90);
 	}
 	
 	if (!isset ($config['history_db_step'])) {
@@ -1145,18 +1203,68 @@ function config_process_config () {
 		config_update_value ( 'ad_domain', '');
 	}
 	
-	if (!isset ($config["ad_adv_perms"])) {
+	if (!isset ($config['ad_adv_perms'])) {
 		config_update_value ('ad_adv_perms', '');
 	}
-	else{
-		$temp_ad_adv_perms = array();
-		if (isset($config['ad_adv_perms'])) {
-			if (!empty($config['ad_adv_perms'])) {
-				$temp_ad_adv_perms = explode(';', io_safe_output($config['ad_adv_perms']));
+	else {
+		if (!json_decode(io_safe_output($config['ad_adv_perms']))) {
+			$temp_ad_adv_perms = array();
+			if ($config['ad_adv_perms'] != '') {
+				$perms = explode(';', io_safe_output($config['ad_adv_perms']));
+				foreach ($perms as $ad_adv_perm) {
+					if (preg_match('/[\[\]]/',$ad_adv_perm)) {
+						$all_data =  explode (",", io_safe_output($ad_adv_perm));
+						$profile = $all_data[0];
+						$group_pnd = $all_data[1];
+						$groups_ad = str_replace(array("[","]"), "", $all_data[2]);
+						$tags = str_replace(array("[","]"), "", $all_data[3]);
+						$groups_ad = explode('|', $groups_ad);
+						$tags_name = explode('|', $tags);
+						$tags_ids = array();
+						foreach ($tags_name as $tag) {
+							$tags_ids[] = tags_get_id($tag);
+						}
+						$profile = profile_get_profiles(
+						array(
+							"name" => io_safe_input($profile)));
+						if (!$profile)
+							continue;
+						$profile_id = array_keys($profile);
+						$id_grupo = groups_get_id (io_safe_input($group_pnd), false);
+						$new_ad_adv_perms[] =
+							array('profile' => $profile_id[0],
+								'group' => array($id_grupo),
+								'tags' => $tags_ids,
+								'groups_ad' => $groups_ad);
+					}
+					else {
+						$all_data =  explode (",", io_safe_output($ad_adv_perm));
+						$profile = $all_data[0];
+						$group_pnd = $all_data[1];
+						$groups_ad = $all_data[2];
+						$tags = $all_data[3];
+						$profile = profile_get_profiles(
+						array(
+							"name" => io_safe_input($profile)));
+						if (!$profile)
+							continue;
+						$profile_id = array_keys($profile);
+						$id_grupo = groups_get_id (io_safe_input($group_pnd), false);
+						
+						$new_ad_adv_perms[] =
+							array('profile' => $profile_id[0],
+								'group' => array($id_grupo),
+								'tags' => array($tags),
+								'groups_ad' => array($groups_ad));
+					}
+				}
+				
+				if (!empty($new_ad_adv_perms)) {
+					$temp_ad_adv_perms = json_encode($new_ad_adv_perms);
+				}
 			}
+			config_update_value ('ad_adv_perms', $temp_ad_adv_perms);
 		}
-		$config['ad_adv_perms'] = $temp_ad_adv_perms;
-		$keysConfig = array_keys($config);
 	}
 	
 	if (!isset ($config['rpandora_server'])) {
@@ -1217,6 +1325,10 @@ function config_process_config () {
 	
 	if (!isset ($config['rintegria_pass'])) {
 		config_update_value ( 'rintegria_pass', '');
+	}
+	
+	if (!isset ($config['saml_path'])) {
+		config_update_value ('saml_path', '/opt/');
 	}
 	
 	if (!isset ($config['integria_enabled'])) {
@@ -1335,6 +1447,15 @@ function config_process_config () {
 	if (!isset($config['interface_unit'])) {
 		config_update_value ('interface_unit',  __('Bytes'));
 	}
+	
+	if (!isset($config['graph_precision'])) {
+		config_update_value ('graph_precision',  1);
+	}
+	else {
+		if (!isset($config['enterprise_installed'])) {
+			config_update_value ('graph_precision',  1);
+		}
+	}
 
 	if (!isset($config['gis_default_icon'])) {
 		config_update_value ('gis_default_icon', "marker");
@@ -1370,6 +1491,10 @@ function config_process_config () {
 	
 	if (!isset($config['type_module_charts'])) {
 		config_update_value ('type_module_charts', 'area');
+	}
+
+	if (!isset($config['type_interface_charts'])) {
+		config_update_value ('type_interface_charts', 'line');
 	}
 	
 	if (!isset($config['render_proc'])) {
@@ -1739,7 +1864,13 @@ function config_prepare_session() {
 	global $config;
 	
 	// Change the session timeout value to session_timeout minutes  // 8*60*60 = 8 hours
-	$sessionCookieExpireTime = $config["session_timeout"] * 60;
+	$sessionCookieExpireTime = $config["session_timeout"];
+	
+	if ($sessionCookieExpireTime <= 0)
+		$sessionCookieExpireTime = 10 * 365 * 24 * 60 * 60;
+	else
+		$sessionCookieExpireTime *= 60;
+	
 	ini_set('session.gc_maxlifetime', $sessionCookieExpireTime);
 	session_set_cookie_params ($sessionCookieExpireTime);
 	

@@ -113,6 +113,7 @@ function configure_modules_form () {
 					js_html_entity_decode (data["name"]));
 				$("#textarea_description").attr ("value",
 					js_html_entity_decode (data["description"]));
+					$("#textarea_description").html(js_html_entity_decode (data["description"]));
 				$("#textarea_configuration_data").val(configuration_data);
 				$("#component_loading").hide ();
 				$("#id_module_type").val(data["type"]);
@@ -246,7 +247,7 @@ function configure_modules_form () {
 				flag_load_plugin_component = true;
 				
 				$("#text-name").attr ("value", js_html_entity_decode (data["name"]));
-				$("#textarea_description").attr ("value", js_html_entity_decode (data["description"]));
+				$("#textarea_description").html (js_html_entity_decode (data["description"]));
 				$("#id_module_type").val(data["type"]);
 				$("#text-max").attr ("value", data["max"]);
 				$("#text-min").attr ("value", data["min"]);
@@ -262,6 +263,10 @@ function configure_modules_form () {
 					.attr ("value", js_html_entity_decode (data["tcp_send"]));
 				$("#textarea_tcp_rcv")
 					.attr ("value", js_html_entity_decode (data["tcp_rcv"]));
+					$("#textarea_tcp_send")
+						.html (js_html_entity_decode (data["tcp_send"]));
+					$("#textarea_tcp_rcv")
+						.html (js_html_entity_decode (data["tcp_rcv"]));
 				$("#text-snmp_community")
 					.attr ("value", js_html_entity_decode (data["snmp_community"]));
 				$("#text-snmp_oid")
@@ -354,10 +359,10 @@ function configure_modules_form () {
 				if (data["type"] >= 15 && data["type"] <= 18) {
 					$("#snmp_version").val(data["tcp_send"]);
 					$("#text-snmp3_auth_user").val(data["plugin_user"]);
-					$("#text-snmp3_auth_pass").val(data["plugin_pass"]);
+					$("#password-snmp3_auth_pass").val(data["plugin_pass"]);
 					$("#snmp3_auth_method").val(data["plugin_parameter"]);
 					$("#snmp3_privacy_method").val(data["custom_string_1"]);
-					$("#text-snmp3_privacy_pass").val(data["custom_string_2"]);
+					$("#password-snmp3_privacy_pass").val(data["custom_string_2"]);
 					$("#snmp3_security_level").val(data["custom_string_3"]);
 					
 					if (data["tcp_send"] == "3") {

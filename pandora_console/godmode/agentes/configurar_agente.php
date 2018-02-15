@@ -19,7 +19,7 @@ global $config;
 
 enterprise_include ('godmode/agentes/configurar_agente.php');
 enterprise_include ('include/functions_policies.php');
-enterprise_include ('include/functions_modules.php');
+enterprise_include_once ('include/functions_modules.php');
 include_once($config['homedir'] . "/include/functions_agents.php");
 include_once($config['homedir'] . "/include/functions_cron.php");
 ui_require_javascript_file('encode_decode_base64');
@@ -970,6 +970,9 @@ if ($update_module || $create_module) {
 	}
 	
 	$ip_target = (string) get_parameter ('ip_target');
+	if($ip_target == ''){
+		$ip_target = 'auto';
+	}
 	$custom_id = (string) get_parameter ('custom_id');
 	$history_data = (int) get_parameter('history_data');
 	$min_warning = (float) get_parameter ('min_warning');
@@ -1001,6 +1004,9 @@ if ($update_module || $create_module) {
 	$month = get_parameter('month');
 	$wday = get_parameter('wday');
 	$cron_interval = "$minute $hour $mday $month $wday";
+	if (!cron_check_syntax($cron)) {
+		$cron_interval = '';
+	}
 	
 	if ($prediction_module != MODULE_PREDICTION_SYNTHETIC) {
 		unset($serialize_ops);
@@ -1015,7 +1021,7 @@ if ($update_module || $create_module) {
 	
 	$throw_unknown_events = (bool)get_parameter('throw_unknown_events', false);
 	//Set the event type that can show.
-	$disabled_types_event = array(EVENTS_GOING_UNKNOWN => (int)!$throw_unknown_events);
+	$disabled_types_event = array(EVENTS_GOING_UNKNOWN => (int)$throw_unknown_events);
 	$disabled_types_event = io_json_mb_encode($disabled_types_event);
 	
 	$module_macro_names = (array) get_parameter('module_macro_names', array());

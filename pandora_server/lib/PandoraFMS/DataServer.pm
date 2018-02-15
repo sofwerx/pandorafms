@@ -25,6 +25,7 @@ use threads::shared;
 use Thread::Semaphore;
 
 use Time::Local;
+use XML::Parser::Expat;
 use XML::Simple;
 use POSIX qw(setsid strftime);
 
@@ -70,6 +71,29 @@ sub new ($$;$) {
 	
 	# Call the constructor of the parent class
 	my $self = $class->SUPER::new($config, DATASERVER, \&PandoraFMS::DataServer::data_producer, \&PandoraFMS::DataServer::data_consumer, $dbh);
+
+	# Load external .enc files for XML::Parser.
+	if ($config->{'enc_dir'} ne '') {
+		if (opendir(my $dh, $config->{'enc_dir'})) {
+			while (my $enc_file = readdir($dh)) {
+
+				# Ignore unknown files.
+				next unless ($enc_file =~ m/.enc$/);
+
+				# Load the .enc file.
+				eval {
+					local $SIG{__DIE__} = {};
+					XML::Parser::Expat::load_encoding($config->{'enc_dir'} . '/' . $enc_file);
+				};
+				if ($@) {
+					print_message ($config, " [WARNING] Error loading encoding file: $enc_file", 1);
+				}
+			}
+			closedir($dh);
+		} else {
+			print_message($config, " [WARNING] Error opening directory " . $config->{'enc_dir'} . ": $!", 1);
+		}
+	}
 
 	bless $self, $class;
 	return $self;
@@ -327,6 +351,13 @@ sub process_xml_data ($$$$$) {
 			}
 		}
 
+		# Check the group password.
+		my $rc = enterprise_hook('check_group_password', [$dbh, $group_id, $data->{'group_password'}]);
+		if (defined($rc) && $rc != 1) {
+			logger($pa_config, "Agent $agent_name did not send a valid password for group id $group_id.", 10);
+			return;
+		}
+
 		my $description = '';
 		$description = $data->{'description'} if (defined ($data->{'description'}));
 		
@@ -544,7 +575,8 @@ sub process_module_data ($$$$$$$$$) {
 	            'datalist' => 0, 'status' => 0, 'unit' => 0, 'timestamp' => 0, 'module_group' => 0, 'custom_id' => '', 
 	            'str_warning' => '', 'str_critical' => '', 'critical_instructions' => '', 'warning_instructions' => '',
 	            'unknown_instructions' => '', 'tags' => '', 'critical_inverse' => 0, 'warning_inverse' => 0, 'quiet' => 0,
-	            'module_ff_interval' => 0, 'alert_template' => '', 'crontab' => ''};
+				'module_ff_interval' => 0, 'alert_template' => '', 'crontab' =>	'', 'min_ff_event_normal' => 0,
+				'min_ff_event_warning' => 0, 'min_ff_event_critical' => 0, 'ff_timeout' => 0, 'each_ff' => 0};
 	
 	# Other tags will be saved here
 	$module_conf->{'extended_info'} = '';
@@ -613,7 +645,10 @@ sub process_module_data ($$$$$$$$$) {
 		
 		# The group name has to be translated to a group ID
 		if (defined $module_conf->{'module_group'}) {
-			$module_conf->{'id_module_group'} = get_module_group_id ($dbh, $module_conf->{'module_group'});
+			my $id_group_module = get_module_group_id ($dbh, $module_conf->{'module_group'});
+			if ( $id_group_module >= 0) {
+				$module_conf->{'id_module_group'} = $id_group_module;
+			}
 			delete $module_conf->{'module_group'};
 		}
 		

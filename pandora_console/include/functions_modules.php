@@ -53,7 +53,7 @@ function modules_is_disable_type_event($id_agent_module = false, $type_event = f
 	if ($id_agent_module === false) {
 		switch ($type_event) {
 			case EVENTS_GOING_UNKNOWN:
-				return true;
+				return false;
 				break;
 			case EVENTS_UNKNOWN:
 				return false;
@@ -118,7 +118,7 @@ function modules_is_disable_type_event($id_agent_module = false, $type_event = f
 			return false;
 		}
 	}
-	return true;
+	return false;
 }
 
 /**
@@ -411,9 +411,19 @@ function modules_update_agent_module ($id, $values,
 			return ERR_EXIST;
 		}
 	}
-	
-	
-	
+
+	if(isset ($values['ip_target'])){
+		if($values['ip_target'] == 'force_pri'){
+			$sql_agent = "SELECT id_agente FROM tagente_modulo WHERE id_agente_modulo=" .  $id;
+			$id_agente = mysql_db_process_sql($sql_agent);
+			$values['ip_target'] = agents_get_address ($id_agente);
+		}
+		elseif($values['ip_target'] == 'custom'){
+			$values['ip_target'] = $values['custom_ip_target'];
+		}
+	}
+	unset($values['custom_ip_target']);
+
 	$where = array();
 	$where['id_agente_modulo'] = $id;
 	if ($onlyNoDeletePending) {
@@ -1019,6 +1029,17 @@ function modules_get_agentmodule_agent_name ($id_agentmodule) {
  */
 function modules_get_agentmodule_name ($id_agente_modulo) {
 	return (string) db_get_value ('nombre', 'tagente_modulo', 'id_agente_modulo', (int) $id_agente_modulo);
+}
+
+/**
+ * Get the module descripcion of an agent module.
+ *
+ * @param int $id_agente_modulo Agent module id.
+ *
+ * @return string descripcion of the given agent module.
+ */
+function modules_get_agentmodule_descripcion ($id_agente_modulo) {
+	return (string) db_get_value ('descripcion', 'tagente_modulo', 'id_agente_modulo', (int) $id_agente_modulo);
 }
 
 /**
@@ -2317,4 +2338,98 @@ function modules_get_unknown_time ($id_agent_module, $date, $period){
 	
 	return $unknown_seconds;
 }
+
+function modules_get_modules_name ($sql_from , $sql_conditions = '', $meta = false) {
+	global $config;
+	
+	if (!$meta) {
+		// Query to get name of the modules to module name filter combo
+		switch ($config['dbtype']) {
+			case 'mysql':
+			case 'postgresql':
+				$sql = 'SELECT distinct(tagente_modulo.nombre)
+					'. $sql_from . $sql_conditions;
+				break;
+			case 'oracle':			
+				$sql = 'SELECT DISTINCT(tagente_modulo.nombre)' .
+					$sql_from . $sql_conditions;
+				break;
+		}
+		
+		$return = db_get_all_rows_sql($sql);
+		
+		return $return;
+	}
+	else {
+		switch ($config['dbtype']) {
+			case 'mysql':
+			case 'postgresql':
+				$sql = 'SELECT distinct(tagente_modulo.nombre)
+					'. $sql_from . $sql_conditions;
+				break;
+			case 'oracle':			
+				$sql = 'SELECT DISTINCT(tagente_modulo.nombre)' .
+					$sql_from . $sql_conditions;
+				break;
+		}
+		
+		// For each server defined and not disabled:h
+		$servers = db_get_all_rows_sql ('SELECT *
+			FROM tmetaconsole_setup
+			WHERE disabled = 0');
+		
+		if ($servers === false)
+			$servers = array();
+		
+		$result = array();
+		$modules = array();
+		foreach($servers as $server) {
+			// If connection was good then retrieve all data server
+			if (metaconsole_connect($server) == NOERR) {
+				$connection = true;
+			}
+			else {
+				$connection = false;
+			}
+			// Get all info for filters of all nodes
+			$modules_temp = db_get_all_rows_sql($sql);
+			
+			$rows_temp = db_get_all_rows_sql('SELECT distinct name
+				FROM tmodule_group
+				ORDER BY name');
+			$rows_temp = io_safe_output($rows_temp);
+			
+			if (!empty($rows_temp)) {
+				foreach ($rows_temp as $module_group_key => $modules_group_val)
+					$rows_temp_processed[$modules_group_val['name']] = $modules_group_val['name'];
+				
+				$rows_select = array_unique(array_merge($rows_select, $rows_temp_processed));
+			}
+			
+			$groups_temp = users_get_groups_for_select(false, "AR", true, true, false);									
+			
+			$groups_temp_processed = array();
+			
+			foreach ($groups_temp as $group_temp_key => $group_temp_val) {
+				$new_key = str_replace('&nbsp;','',$group_temp_val);
+				$groups_temp_processed[$new_key] = $group_temp_val;
+			}
+			
+			if (!empty($groups_temp_processed)) {
+				$groups_select = array_unique(array_merge($groups_select, $groups_temp_processed));
+			}
+			
+			if (!empty($modules_temp))
+				$modules = array_merge($modules, $modules_temp);
+			
+			metaconsole_restore_db();
+		}
+		unset($groups_select[__('All')]);
+		$key_group_all = array_search(__('All'), $groups_select);
+		if ($key_group_all !== false)
+			unset($groups_select[$key_group_all]);
+		return $modules;
+	}
+}
+
 ?>

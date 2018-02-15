@@ -33,7 +33,7 @@ use PandoraFMS::Tools;
 use PandoraFMS::DB;
 
 # version: define current version
-my $version = "6.0SP3 PS160627";
+my $version = "6.0SP5 PS170118";
 
 # Pandora server configuration
 my %conf;
@@ -165,6 +165,12 @@ sub pandora_purgedb ($$) {
 	if (!defined($conf->{'_string_purge'})){
 		$conf->{'_string_purge'} = 7;
 	}
+	# Update alert with last_fired older than today - time_threshold
+	my @templates = get_db_rows ($dbh, 'SELECT t1.id,t1.time_threshold FROM talert_templates t1 WHERE EXISTS ( SELECT * FROM talert_template_modules t2 WHERE t1.id = t2.id_alert_template );');
+	foreach my $template(@templates) {
+		db_do($dbh, 'UPDATE talert_template_modules SET times_fired = 0 WHERE id_alert_template = ? AND times_fired > 0 AND last_fired < (? - ?)',$template->{'id'},time(),$template->{'time_threshold'});
+	}
+
 	if ($conf->{'_string_purge'} > 0) {
 		$ulimit_access_timestamp = time() - 86400;
 		$ulimit_timestamp = time() - (86400 * $conf->{'_days_purge'});
@@ -656,12 +662,14 @@ sub pandora_load_config ($) {
 	$conf->{'_last_compact'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'last_compact'");
 	$conf->{'_step_compact'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'step_compact'");
 	$conf->{'_history_db_enabled'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_enabled'");
+	$conf->{'_history_event_enabled'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_event_enabled'");
 	$conf->{'_history_db_host'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_host'");
 	$conf->{'_history_db_port'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_port'");
 	$conf->{'_history_db_name'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_name'");
 	$conf->{'_history_db_user'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_user'");
 	$conf->{'_history_db_pass'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_pass'");
 	$conf->{'_history_db_days'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_days'");
+	$conf->{'_history_event_days'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_event_days'");
 	$conf->{'_history_db_step'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_step'");
 	$conf->{'_history_db_delay'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'history_db_delay'");
 	$conf->{'_days_delete_unknown'} = get_db_value ($dbh, "SELECT value FROM tconfig WHERE token = 'days_delete_unknown'");
@@ -994,6 +1002,9 @@ sub pandoradb_main ($$$) {
 	# Move old data to the history DB
 	if (defined ($history_dbh)) {
 		undef ($history_dbh) unless defined (enterprise_hook ('pandora_historydb', [$dbh, $history_dbh, $conf->{'_history_db_days'}, $conf->{'_history_db_step'}, $conf->{'_history_db_delay'}]));
+		if (defined($conf{'_history_event_enabled'})) {
+			undef ($history_dbh) unless defined (enterprise_hook ('pandora_history_event', [$dbh, $history_dbh, $conf->{'_history_event_days'}, $conf->{'_history_db_step'}, $conf->{'_history_db_delay'}]));
+		}
 	}
 
 	# Compact on if enable and DaysCompact are below DaysPurge 

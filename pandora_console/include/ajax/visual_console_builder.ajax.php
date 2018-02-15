@@ -153,7 +153,7 @@ switch ($action) {
 		if ($id_custom_graph != 0) {
 			$img = custom_graphs_print(
 				$id_custom_graph, $height, $width, $period,
-				true, true, 0, true, $background_color);
+				null, true, 0, true, $background_color);
 		}
 		else {
 			$img = grafico_modulo_sparse($id_agent_module,
@@ -189,13 +189,16 @@ switch ($action) {
 	case 'get_layout_data':
 		$layoutData = db_get_row_filter('tlayout_data',
 			array('id' => $id_element));
-		
+		$layoutData['height'] = $layoutData['height'];
+		$layoutData['width']  = $layoutData['width'];
 		echo json_encode($layoutData);
 		break;
 	
 	
 	
 	case 'get_module_value':
+		global $config;
+	
 		$unit_text = false;
 		$layoutData = db_get_row_filter('tlayout_data', array('id' => $id_element));
 		switch ($layoutData['type']) {
@@ -337,7 +340,16 @@ switch ($action) {
 				break;
 		}
 		
+		//~ $returnValue_value = explode('&nbsp;', $returnValue);
+		
 		$return = array();
+		if ($returnValue_value[1] != "") {
+			//~ $return['value'] = remove_right_zeros(number_format($returnValue_value[0], $config['graph_precision'])) . " " . $returnValue_value[1];
+		}
+		else {
+			//~ $return['value'] = remove_right_zeros(number_format($returnValue_value[0], $config['graph_precision']));
+		}
+		
 		$return['value'] = $returnValue;
 		$return['max_percentile'] = $layoutData['height'];
 		$return['width_percentile'] = $layoutData['width'];
@@ -787,24 +799,31 @@ switch ($action) {
 				break;
 			case 'module_graph':
 				$values['type'] = MODULE_GRAPH;
+				
 				if ($values['id_custom_graph'] > 0 ) {
 					$values['height'] = $height_module_graph;
 					$values['width'] = $width_module_graph;
 					
 					$graph_conf = db_get_row('tgraph', 'id_graph', $values['id_custom_graph']);
+					
 					$graph_stacked = $graph_conf['stacked'];
 					if ( $graph_stacked == CUSTOM_GRAPH_BULLET_CHART) {
 						$values['height'] = 50;
 					}
 					elseif ($graph_stacked == CUSTOM_GRAPH_GAUGE ){
-						if ( $height_module_graph < 150 )
+						if ( $height_module_graph < 150 ) {
 							$values['height'] = 150;
-						elseif( $height_module_graph >= 150 && $height_module_graph < 250 )
-								$values['height'] = $graph_height;
-							elseif( $height_module_graph >= 250 )
-								$values['height'] = 200;
+						}
+						elseif(($height_module_graph >= 150) 
+							&& ($height_module_graph < 250)) {
+								$values['height'] = $graph_conf['height'];
+						}
+						elseif( $height_module_graph >= 250 ) {
+							$values['height'] = 200;
+						}	
 					}
-				} else {
+				} 
+				else {
 					$values['height'] = $height_module_graph;
 					$values['width'] = $width_module_graph;
 				}

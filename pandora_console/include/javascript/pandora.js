@@ -157,6 +157,15 @@ function agent_changed_by_multiple_agents (event, id_agent, selected) {
 		}
 	}
 	
+	var module_status = -1;
+	if (typeof $("#status_module") !== 'undefined') {
+		try {
+			module_status = $("#status_module").val();
+		}
+		catch (error) {
+		}
+	}
+	
 	// Module name
 	var module_name = $("#text-module_filter").val();
 	
@@ -222,7 +231,8 @@ function agent_changed_by_multiple_agents (event, id_agent, selected) {
 			"name": module_name,
 			"selection_mode": selection_mode,
 			"serialized": serialized,
-			"id_server": id_server
+			"id_server": id_server,
+			"status_module": module_status
 		},
 		function (data) {
 			$('#module').empty ();
@@ -382,6 +392,15 @@ function module_changed_by_multiple_modules (event, id_module, selected) {
 	$('#agents').empty ();
 	$('#agents').append ($('<option></option>').html ("Loading...").attr ("value", 0));
 	
+	var status_module = -1;
+	if (typeof $("#status_module") !== 'undefined') {
+		try {
+			status_module = $("#status_module").val();
+		}
+		catch (error) {
+		}
+	}
+	
 	var selection_mode = $('#agents_selection_mode').val();
 	if(selection_mode == undefined) {
 		selection_mode = 'common';
@@ -390,6 +409,7 @@ function module_changed_by_multiple_modules (event, id_module, selected) {
 	jQuery.post('ajax.php', 
 		{"page": "operation/agentes/ver_agente",
 		"get_agents_json_for_multiple_modules": 1,
+		"status_module": status_module,
 		"module_name[]": idModules,
 		"selection_mode": selection_mode
 		},
@@ -1005,10 +1025,25 @@ function removeTinyMCE(elementID) {console.log(elementID);
 }
 
 function addTinyMCE(elementID) {
-	if (elementID.length > 0 && !isEmptyObject(tinyMCE))
+	if (elementID.length > 0 && !isEmptyObject(tinyMCE)) 
 		tinyMCE.EditorManager.execCommand('mceAddControl', true, elementID);
 }
 
+function autoclick_profile_users(actual_level, firts_level, second_level) {
+	if ($('#checkbox-' + actual_level).is(":checked")) {
+		if (typeof firts_level !== "undefined") {
+			var is_checked_firts = $('#checkbox-' + firts_level).is(':checked');
+			if (!is_checked_firts) {
+				$('#checkbox-' + firts_level).prop('checked', true);
+			}
+			if (second_level !== false) {
+				if (!$('#checkbox-' + second_level).is(":checked")) {
+					$('#checkbox-' + second_level).prop('checked', true);
+				}
+			}
+		}
+	}
+}
 /**
  * Auto hides an element and shows it
  * when the user moves the mouse over the body.

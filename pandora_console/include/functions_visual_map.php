@@ -94,8 +94,10 @@ function visual_map_print_item($mode = "read", $layoutData,
 	require_once ($config["homedir"] . '/include/functions_graph.php');
 	require_once ($config["homedir"] . '/include/functions_custom_graphs.php');
 	
+	//add 60 px for visual console map
 	$width = $layoutData['width'];
-	$height = $max_percentile = $layoutData['height'];
+	$height = $layoutData['height'];
+	$max_percentile = $layoutData['height'];
 	$top = $layoutData['pos_y'];
 	$left = $layoutData['pos_x'];
 	$id = $layoutData['id'];
@@ -747,6 +749,8 @@ function visual_map_print_item($mode = "read", $layoutData,
 				$percentile = 100;
 			break;
 		case MODULE_GRAPH:
+			$width	+= 60;
+			$height	+= 60;
 			if (!empty($proportion)) {
 				$width =
 					((integer)($proportion['proportion_width'] * $width));
@@ -799,7 +803,6 @@ function visual_map_print_item($mode = "read", $layoutData,
 			$z_index = 1;
 			break;
 	}
-	
 	
 	$class = "item ";
 	switch ($type) {
@@ -1007,9 +1010,24 @@ function visual_map_print_item($mode = "read", $layoutData,
 			$value = visual_map_get_simple_value($type,
 					$layoutData['id_agente_modulo'], $period);
 			
-			// If the value is a string, dont format it
-			if (!is_string($value)) {
-				$value = format_for_graph($value, 2);
+			global $config;
+			
+			if ($type == SIMPLE_VALUE) {
+				//~ $returnValue_value = explode('&nbsp;', $value);
+				
+				//~ if ($returnValue_value[1] != "") {
+					//~ $value = remove_right_zeros(number_format($returnValue_value[0], $config['graph_precision'])) . " " . $returnValue_value[1];
+				//~ }
+				//~ else {
+					//~ $value = remove_right_zeros(number_format($returnValue_value[0], $config['graph_precision']));
+				//~ }
+				
+			}
+			else {
+				// If the value is a string, dont format it
+				if (!is_string($value)) {
+					//~ $value = remove_right_zeros(format_for_graph($value, $config['graph_precision']));
+				}
 			}
 			
 			$io_safe_output_text = str_replace(array('_VALUE_','_value_'), $value, $io_safe_output_text);
@@ -1127,6 +1145,8 @@ function visual_map_get_simple_value_type($process_simple_value) {
  * @return string value retrieved with units
  */
 function visual_map_get_simple_value($type, $id_module, $period = SECONDS_1DAY) {
+	global $config;
+	
 	$unit_text = db_get_sql ('SELECT unit
 		FROM tagente_modulo WHERE id_agente_modulo = ' . $id_module);
 	$unit_text = trim(io_safe_output($unit_text));
@@ -1140,11 +1160,16 @@ function visual_map_get_simple_value($type, $id_module, $period = SECONDS_1DAY) 
 			}
 			else {
 				if ( is_numeric($value) )
-					$value = format_for_graph($value, 2);
+					$value = format_for_graph($value, $config['graph_precision']);
 				if (!empty($unit_text)) {
 					$value .= " " . $unit_text;
 				}
 			}
+			
+			$value = preg_replace ('/\n/i','<br>',$value);
+            $value =  preg_replace ('/\t/i','&#09;',$value);
+            $value =  preg_replace ('/\s/i','&nbsp;',$value);
+			
 			return $value;
 			break;
 		case SIMPLE_VALUE_MAX:
@@ -2025,7 +2050,7 @@ function visual_map_print_visual_map ($id_layout, $show_links = true,
 	}
 	
 	if (defined('METACONSOLE')) {
-		echo "<div style='width: 920px; overflow:auto; margin: 0 auto;'>";
+		echo "<div style='width: 100%; overflow:auto; margin: 0 auto; padding:5px;'>";
 	}
 	
 	echo '<div id="background_'.$id_layout.'"
@@ -2116,9 +2141,9 @@ function visual_map_get_user_layouts ($id_user = 0, $only_names = false, $filter
 		$filter = array ();
 	
 	if ($returnAllGroup)
-		$groups = users_get_groups ($id_user, 'RR');
+		$groups = users_get_groups ($id_user, 'VR');
 	else
-		$groups = users_get_groups ($id_user, 'RR', false);
+		$groups = users_get_groups ($id_user, 'VR', false);
 	
 	if (!empty($groups)) {
 		if (empty($where))

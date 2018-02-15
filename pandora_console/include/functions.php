@@ -248,7 +248,33 @@ function format_for_graph ($number , $decimals = 1, $dec_point = ".", $thousands
 		$number = $number / 1000;
 	}
 	
-	return format_numeric ($number, $decimals). $shorts[$pos]; //This will actually do the rounding and the decimals
+	return remove_right_zeros(format_numeric ($number, $decimals)). $shorts[$pos]; //This will actually do the rounding and the decimals
+}
+
+function human_milliseconds_to_string($seconds) {
+    $ret = "";
+	
+    /*** get the days ***/
+    $days = intval(intval($seconds) / (360000*24));
+    if($days > 0)
+		$ret .= "$days days ";
+	
+    /*** get the hours ***/
+    $hours = (intval($seconds) / 360000) % 24;
+    if($hours > 0)
+		$ret .= "$hours hours ";
+
+    /*** get the minutes ***/
+    $minutes = (intval($seconds) / 6000) % 60;
+    if($minutes > 0)
+		$ret .= "$minutes minutes ";
+	
+    /*** get the seconds ***/
+    $seconds = intval($seconds / 100) % 60;
+    if ($seconds > 0)
+        $ret .= "$seconds seconds";
+	
+    return $ret;
 }
 
 /**
@@ -1722,6 +1748,9 @@ function check_login ($output = true) {
 		}
 	}
 	
+	if (isset($_SESSION['session_public']) && $_SESSION['session_public']['session_public'] )
+		return true;
+	
 	if (!$output) {
 		return false;
 	}
@@ -1749,11 +1778,11 @@ function check_login ($output = true) {
  * @param int $id_user User id
  * @param int $id_group Agents group id to check from
  * @param string $access Access privilege
- * @param int $id_agent The agent id.
+ * @param bool $onlyOneGroup Flag to check acl for specified group only (not to roots up, or check acl for 'All' group when $id_group is 0).
  *
  * @return bool 1 if the user has privileges, 0 if not.
  */
-function check_acl($id_user, $id_group, $access, $id_agent = 0) {
+function check_acl($id_user, $id_group, $access, $onlyOneGroup = false) {
 	if (empty ($id_user)) {
 		//User ID needs to be specified
 		trigger_error ("Security error: check_acl got an empty string for user id", E_USER_WARNING);
@@ -1767,7 +1796,7 @@ function check_acl($id_user, $id_group, $access, $id_agent = 0) {
 	}
 	
 	$parents_id = array($id_group);
-	if ($id_group != 0) {
+	if ($id_group != 0 && $onlyOneGroup !== true) {
 		$group = db_get_row_filter('tgrupo', array('id_grupo' => $id_group));
 		$parents = groups_get_parents($group['parent'], true);
 		
@@ -1775,13 +1804,10 @@ function check_acl($id_user, $id_group, $access, $id_agent = 0) {
 			$parents_id[] = $parent['id_grupo'];
 		}
 	}
-	else {
-		$parents_id = array();
-	}
 	
 	// TODO: To reduce this querys in one adding the group condition if necessary (only one line is different)
 	//Joined multiple queries into one. That saves on the query overhead and query cache.
-	if ($id_group == 0) {
+	if ($id_group == 0 && $onlyOneGroup !== true) {
 		$query = sprintf("SELECT tperfil.incident_view, tperfil.incident_edit,
 				tperfil.incident_management, tperfil.agent_view,
 				tperfil.agent_edit, tperfil.alert_edit,
@@ -1796,7 +1822,7 @@ function check_acl($id_user, $id_group, $access, $id_agent = 0) {
 			FROM tusuario_perfil, tperfil
 			WHERE tusuario_perfil.id_perfil = tperfil.id_perfil
 				AND tusuario_perfil.id_usuario = '%s'", $id_user);
-		//GroupID = 0, group id doesnt matter (use with caution!)
+		//GroupID = 0 and onlyOneGroup = false, group id doesnt matter (use with caution!)
 	}
 	else {
 		$query = sprintf("SELECT tperfil.incident_view, tperfil.incident_edit,
@@ -2070,10 +2096,16 @@ function delete_dir($dir) {
 }
 
 /**
+ * Returns 1 if the data contains a codified image (base64)
+ */
+function is_image_data ($data) {
+	return (substr($data,0,10) == "data:image");
+}
+
+/**
 *  Returns 1 if this is Snapshot data, 0 otherwise
 *  Looks for two or more carriage returns.
 */
-
 function is_snapshot_data ($data) {
 	
 	// TODO IDEA: In the future, we can set a variable in setup
@@ -2083,7 +2115,7 @@ function is_snapshot_data ($data) {
 	$temp = array();
 	$count = preg_match_all ("/\n/", $data, $temp);
 	
-	if ($count > 2)
+	if ( ($count > 2) || (is_image_data($data)) )
 		return 1;
 	else
 		return 0;
@@ -2260,6 +2292,11 @@ function print_audit_csv ($data) {
 	global $config;
 	global $graphic_type;
 
+	if (!$data) {
+		echo __('No data found to export');
+		return 0;
+	}
+
 	$config['ignore_callback'] = true;
 	while (@ob_end_clean ());
 	
@@ -2267,20 +2304,20 @@ function print_audit_csv ($data) {
 	header("Content-Disposition: attachment; filename=audit_log".date("Y-m-d_His").".csv");
 	header("Pragma: no-cache");
 	header("Expires: 0");
+
+	// BOM
+	print pack('C*',0xEF,0xBB,0xBF);
 	
-	if ($data) {
-		echo __('User') . ';' .
-			__('Action') . ';' .
-			__('Date') . ';' .
-			__('Source ID') . ';' .
-			__('Comments') ."\n";
-		foreach ($data as $line) {
-			echo io_safe_output($line['id_usuario']) . ';' .  io_safe_output($line['accion']) . ';' .  $line['fecha'] . ';' .  $line['ip_origen'] . ';'.  io_safe_output($line['descripcion']). "\n";
-		}
+	echo __('User') . ';' .
+		__('Action') . ';' .
+		__('Date') . ';' .
+		__('Source ID') . ';' .
+		__('Comments') ."\n";
+	foreach ($data as $line) {
+		echo io_safe_output($line['id_usuario']) . ';' .  io_safe_output($line['accion']) . ';' .  $line['fecha'] . ';' .  $line['ip_origen'] . ';'.  io_safe_output($line['descripcion']). "\n";
 	}
-	else {
-		echo __('No data found to export');
-	}
+
+	exit;
 }
 
 /**
@@ -2552,5 +2589,92 @@ function get_refresh_time_array() {
 		(string)SECONDS_15MINUTES => __('15 minutes'),
 		(string)SECONDS_30MINUTES => __('30 minutes'),
 		(string)SECONDS_1HOUR => __('1 hour'));
+}
+
+function date2strftime_format($date_format) {
+	$replaces_list = array(
+		'D' => '%a',
+		'l' => '%A',
+		'd' => '%d',
+		'j' => '%e',
+		'N' => '%u',
+		'w' => '%w',
+		'W' => '%W',
+		'M' => '%b',
+		'F' => '%B',
+		'm' => '%m',
+		'o' => '%G',
+		'y' => '%y',
+		'Y' => '%Y',
+		'H' => '%H',
+		'h' => '%I',
+		'g' => '%l',
+		'a' => '%P',
+		'A' => '%p',
+		'i' => '%M',
+		's' => '%S',
+		'u' => '%s',
+		'O' => '%z',
+		'T' => '%Z',
+		'%' => '%%',
+		);
+	
+	$return = "";
+	
+	//character to character because 
+	// Replacement order gotcha
+	//		http://php.net/manual/en/function.str-replace.php
+	$chars = str_split($date_format);
+	foreach ($chars as $c) {
+		if (isset($replaces_list[$c])) {
+			$return .= $replaces_list[$c];
+		}
+		else {
+			$return .= $c;
+		}
+	}
+	
+	return $return;
+}
+
+function pandora_setlocale() {
+	global $config;
+	
+	$replace_locale = array(
+		'ca' => 'ca_ES',
+		'de' => 'de_DE',
+		'en_GB' => 'de',
+		'es' => 'es_ES',
+		'fr' => 'fr_FR',
+		'it' => 'it_IT',
+		'nl' => 'nl_BE',
+		'pl' => 'pl_PL',
+		'pt' => 'pt_PT',
+		'pt_BR' => 'pt_BR',
+		'sk' => 'sk_SK',
+		'tr' => 'tr_TR',
+		'cs' => 'cs_CZ',
+		'el' => 'el_GR',
+		'ru' => 'ru_RU',
+		'ar' => 'ar_MA',
+		'ja' => 'ja_JP.UTF-8',
+		'zh_CN' => 'zh_CN',
+		);
+	
+	$user_language = get_user_language($config['id_user']);
+	
+	setlocale(LC_ALL,
+		str_replace(array_keys($replace_locale), $replace_locale, $user_language));
+}
+
+function remove_right_zeros ($value) {
+	$is_decimal = explode(".", $value);
+	if (isset($is_decimal[1])) {
+		$value_to_return = rtrim($value, "0");
+		return rtrim($value_to_return, ".");
+	}
+	else {
+		return $value;
+	}
 }
 ?>

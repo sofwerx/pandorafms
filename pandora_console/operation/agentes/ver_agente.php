@@ -42,7 +42,7 @@ if (is_ajax ()) {
 	$get_agentmodule_status_tooltip = (bool) get_parameter ("get_agentmodule_status_tooltip");
 	$get_group_status_tooltip = (bool) get_parameter ("get_group_status_tooltip");
 	$get_agent_id = (bool) get_parameter ("get_agent_id");
-	
+	$id_group = (int) get_parameter('id_group');
 	if ($get_agents_group_json) {
 		$id_group = (int) get_parameter('id_group');
 		$recursion = (int) get_parameter ('recursion', 0);
@@ -145,6 +145,7 @@ if (is_ajax ()) {
 	if ($get_agents_json_for_multiple_modules) {
 		$nameModules = get_parameter('module_name');
 		$selection_mode = get_parameter('selection_mode','common');
+		$status_modulo = (int) get_parameter ('status_module', -1);
 		
 		$groups = users_get_groups ($config["id_user"], "AW", false);
 		$group_id_list = ($groups ? join(",",array_keys($groups)):"0");
@@ -154,6 +155,32 @@ if (is_ajax ()) {
 			WHERE t1.id_agente = t2.id_agente
 				AND t1.id_grupo IN (' . $group_id_list .')
 				AND t2.nombre IN (\'' . implode('\',\'', $nameModules) . '\')';
+		
+		// Status selector
+		if ($status_modulo == AGENT_MODULE_STATUS_NORMAL) { //Normal
+			$sql_conditions .= ' estado = 0 AND utimestamp > 0)
+			OR (t1.id_tipo_modulo IN(21,22,23,100))) ';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_CRITICAL_BAD) { //Critical
+			$sql_conditions .= ' estado = 1 AND utimestamp > 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_WARNING) { //Warning
+			$sql_conditions .= ' estado = 2 AND utimestamp > 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_NOT_NORMAL) { //Not normal
+			$sql_conditions .= ' estado <> 0';
+		} 
+		elseif ($status_modulo == AGENT_MODULE_STATUS_UNKNOWN) { //Unknown
+			$sql_conditions .= ' estado = 3 AND utimestamp <> 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_NOT_INIT) { //Not init
+			$sql_conditions .= ' utimestamp = 0 )
+				AND t1.id_tipo_modulo NOT IN (21,22,23,100)';
+		}
+		
+		if ($status_modulo != -1) {
+			$filter .= ' AND t1.id_agente_modulo IN (SELECT id_agente_modulo FROM tagente_estado where ' . $sql_conditions;
+		}
 		
 		if ($selection_mode == 'common') {
 			$sql .= 'AND (
@@ -225,6 +252,7 @@ if (is_ajax ()) {
 		$selection_mode = get_parameter('selection_mode', 'common');
 		$serialized = get_parameter('serialized', '');
 		$id_server = (int) get_parameter('id_server', 0);
+		$status_modulo = (int) get_parameter ('status_module', -1);
 		$metaconsole_server_name = null;
 		if (!empty($id_server)) {
 			$metaconsole_server_name = db_get_value('server_name',
@@ -259,6 +287,32 @@ if (is_ajax ()) {
 					$filter .= " AND UPPER(t1.nombre) LIKE UPPER('%$module_name%')";
 					break;
 			}
+		}
+		
+		// Status selector
+		if ($status_modulo == AGENT_MODULE_STATUS_NORMAL) { //Normal
+			$sql_conditions .= ' estado = 0 AND utimestamp > 0 )
+			 OR (t1.id_tipo_modulo IN(21,22,23,100)) ';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_CRITICAL_BAD) { //Critical
+			$sql_conditions .= ' estado = 1 AND utimestamp > 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_WARNING) { //Warning
+			$sql_conditions .= ' estado = 2 AND utimestamp > 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_NOT_NORMAL) { //Not normal
+			$sql_conditions .= ' estado <> 0)';
+		} 
+		elseif ($status_modulo == AGENT_MODULE_STATUS_UNKNOWN) { //Unknown
+			$sql_conditions .= ' estado = 3 AND utimestamp <> 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_NOT_INIT) { //Not init
+			$sql_conditions .= ' utimestamp = 0 )
+				AND t1.id_tipo_modulo NOT IN (21,22,23,100)';
+		}
+		
+		if ($status_modulo != -1) {
+			$filter .= ' AND t1.id_agente_modulo IN (SELECT id_agente_modulo FROM tagente_estado where ' . $sql_conditions;
 		}
 		
 		if (is_metaconsole()) {
@@ -382,7 +436,19 @@ if (is_ajax ()) {
 			asort($result);
 		}
 		else {
-			$sql = 'SELECT DISTINCT(nombre)
+      
+      if(implode(',', $idAgents) < 0){
+      
+        
+      $sql = 'SELECT DISTINCT(nombre) FROM tagente_modulo
+WHERE nombre IN (
+SELECT nombre
+FROM tagente_modulo 
+GROUP BY nombre
+HAVING count(nombre) = (SELECT count(nombre) FROM tagente_modulo))';
+      }
+      else{
+      	$sql = 'SELECT DISTINCT(nombre)
 				FROM tagente_modulo t1
 				WHERE ' . $filter . '
 					AND t1.delete_pending = 0
@@ -395,8 +461,10 @@ if (is_ajax ()) {
 							WHERE t2.delete_pending = 0
 								AND t1.nombre = t2.nombre
 								AND t2.id_agente IN (' . implode(',', $idAgents) . ')) = (' . count($idAgents) . ')';
+			}elseif ($selection_mode == 'unknown'){
+				$sql .= 'AND t1.id_agente_modulo IN (SELECT id_agente_modulo FROM tagente_estado where estado = 3 OR estado = 4)';
 			}
-			
+    }
 			$sql .= ' ORDER BY nombre';
 			
 			$nameModules = db_get_all_rows_sql($sql);
@@ -428,6 +496,7 @@ if (is_ajax ()) {
 		$delete_pending = (int) get_parameter ('delete_pending', -1);
 		// Use 0 as not received
 		$id_tipo_modulo = (int) get_parameter ('id_tipo_modulo', 0);
+		$status_modulo = (int) get_parameter ('status_module', -1);
 		
 		// Filter
 		$filter = array();
@@ -439,6 +508,33 @@ if (is_ajax ()) {
 			$filter['id_tipo_modulo'] = $id_tipo_modulo;
 		if (empty($filter))
 			$filter = false;
+		
+		// Status selector
+		if ($status_modulo == AGENT_MODULE_STATUS_NORMAL) { //Normal
+			$sql_conditions .= ' estado = 0 AND utimestamp > 0 ) 
+			OR (tagente_modulo.id_tipo_modulo IN(21,22,23,100)) ';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_CRITICAL_BAD) { //Critical
+			$sql_conditions .= ' estado = 1 AND utimestamp > 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_WARNING) { //Warning
+			$sql_conditions .= ' estado = 2 AND utimestamp > 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_NOT_NORMAL) { //Not normal
+			$sql_conditions .= ' estado <> 0 )';
+		} 
+		elseif ($status_modulo == AGENT_MODULE_STATUS_UNKNOWN) { //Unknown
+			$sql_conditions .= ' estado = 3 AND utimestamp <> 0 )';
+		}
+		elseif ($status_modulo == AGENT_MODULE_STATUS_NOT_INIT) { //Not init
+			$sql_conditions .= ' utimestamp = 0 )
+				AND tagente_modulo.id_tipo_modulo NOT IN (21,22,23,100)';
+		}
+		
+		if ($status_modulo != -1) {
+			$filter['id_agente_modulo IN'] = ' (SELECT id_agente_modulo FROM tagente_estado where ' . $sql_conditions;
+		}
+		
 		
 		$get_id_and_name = (bool) get_parameter ('get_id_and_name');
 		$get_distinct_name = (bool) get_parameter ('get_distinct_name');
@@ -742,7 +838,9 @@ $id_agente = (int) get_parameter ("id_agente", 0);
 if (empty ($id_agente)) {
 	return;
 }
-
+$agent_a = check_acl ($config['id_user'], 0, "AR");
+$agent_w = check_acl ($config['id_user'], 0, "AW");
+$access = ($agent_a == true) ? 'AR' : (($agent_w == true) ? 'AW' : 'AR');
 $agent = db_get_row ('tagente', 'id_agente', $id_agente);
 // get group for this id_agente
 $id_grupo = $agent['id_grupo'];
@@ -753,7 +851,7 @@ if ($is_extra === ENTERPRISE_NOT_HOOK) {
 	$is_extra = false;
 }
 
-if (! check_acl ($config['id_user'], $id_grupo, "AR", $id_agente) && !$is_extra) {
+if (! check_acl ($config['id_user'], $id_grupo, "AR", $id_agente) && ! check_acl ($config['id_user'], $id_grupo, "AW", $id_agente) && !$is_extra) {
 	db_pandora_audit("ACL Violation",
 		"Trying to access (read) to agent ".agents_get_name($id_agente));
 	include ("general/noaccess.php");

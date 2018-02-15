@@ -1067,13 +1067,13 @@ function hiddenFields(item) {
 		enterprise_hiddenFields(item);
 	}
 
-	var code_control = tinyMCE.activeEditor.controlManager.controls['text-label_code'];
-	if (item == 'label') {
-		code_control.setDisabled(false);
-	}
-	else {
-		code_control.setDisabled(true);
-	}
+	//~ var code_control = tinyMCE.activeEditor.controlManager.controls['text-label_code'];
+	//~ if (item == 'label') {
+		//~ code_control.setDisabled(false);
+	//~ }
+	//~ else {
+		//~ code_control.setDisabled(true);
+	//~ }
 }
 
 function cleanFields(item) {
@@ -1238,8 +1238,8 @@ function setModuleGraph(id_data) {
 			id_agente_modulo = data['id_agente_modulo'];
 			id_custom_graph = data['id_custom_graph'];
 			label = data['label'];
-			height = data['height'];
-			width = data['width'];
+			height = (data['height'] + 60);
+			width = (data['width'] + 60);
 			period = data['period'];
 			background_color = data['image'];
 
@@ -1608,7 +1608,7 @@ function createItem(type, values, id_data) {
 		case 'simple_value':
 			sizeStyle = '';
 			imageSize = '';
-			item = $('<div id="' + id_data + '" class="item simple_value" style="text-align: center; position: absolute; ' + sizeStyle + ' top: ' + values['top'] + 'px; left: ' + values['left'] + 'px;">' +
+			item = $('<div id="' + id_data + '" class="item simple_value" style="position: absolute; ' + sizeStyle + ' top: ' + values['top'] + 'px; left: ' + values['left'] + 'px;">' +
 					'<span id="text_' + id_data + '" class="text"> ' + values['label'] + '</span> ' + '</div>'
 			);
 			setModuleValue(id_data,values.process_simple_value,values.period);

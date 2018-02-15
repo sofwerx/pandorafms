@@ -26,7 +26,7 @@ enterprise_include_once('include/functions_config_agents.php');
 
 check_login ();
 
-if (! check_acl ($config['id_user'], 0, "AR")) {
+if (! check_acl ($config['id_user'], 0, "AR") && ! check_acl ($config['id_user'], 0, "AW")) {
 	db_pandora_audit("ACL Violation", "Trying to access agent main list view");
 	require ("general/noaccess.php");
 	
@@ -120,6 +120,9 @@ $recursion = get_parameter('recursion', 0);
 $status = (int) get_parameter ('status', -1);
 
 $strict_user = db_get_value('strict_acl', 'tusuario', 'id_user', $config['id_user']);
+$agent_a = (bool) check_acl ($config['id_user'], 0, "AR");
+$agent_w = (bool) check_acl ($config['id_user'], 0, "AW");
+$access = ($agent_a === true) ? 'AR' : (($agent_w === true) ? 'AW' : 'AR');
 
 $onheader = array();
 
@@ -163,8 +166,9 @@ echo '<tr><td style="white-space:nowrap;">';
 
 echo __('Group') . '&nbsp;';
 
-$groups = users_get_groups ();
-html_print_select_groups(false, "AR", true, 'group_id', $group_id, 'this.form.submit()', '', '', false, false, true, '', false, 'width:150px');
+$groups = users_get_groups (false, $access);
+
+html_print_select_groups(false, $access, true, 'group_id', $group_id, 'this.form.submit()', '', '', false, false, true, '', false, 'width:150px');
 
 echo '</td><td style="white-space:nowrap;">';
 
@@ -338,7 +342,28 @@ switch ($sortField) {
 
 $search_sql = '';
 if ($search != "") {
-	$search_sql = " AND ( nombre " . $order_collation . " LIKE '%$search%' OR direccion LIKE '%$search%' OR comentarios LIKE '%$search%') ";
+	//$search_sql = " AND ( nombre " . $order_collation . " LIKE '%$search%' OR direccion LIKE '%$search%' OR comentarios LIKE '%$search%') ";
+	$sql = "SELECT DISTINCT taddress_agent.id_agent FROM taddress
+	INNER JOIN taddress_agent ON
+	taddress.id_a = taddress_agent.id_a
+	WHERE taddress.ip LIKE '%$search%'";
+
+	$id = db_get_all_rows_sql($sql);
+	if($id != ''){
+		$aux = $id[0]['id_agent'];
+		$search_sql = " AND ( nombre " . $order_collation . "
+			LIKE '%$search%' OR tagente.id_agente = $aux";
+		if(count($id)>=2){
+			for ($i = 1; $i < count($id); $i++){
+				$aux = $id[$i]['id_agent'];
+				$search_sql .= " OR tagente.id_agente = $aux";
+			}
+		}
+		$search_sql .= ")";
+	}else{
+		$search_sql = " AND ( nombre " . $order_collation . "
+			LIKE '%$search%') ";
+	}
 }
 
 // Show only selected groups
@@ -350,7 +375,7 @@ if ($group_id > 0) {
 }
 else {
 	$groups = array();
-	$user_groups = users_get_groups($config["id_user"], "AR");
+	$user_groups = users_get_groups($config["id_user"], $access);
 	$groups = array_keys($user_groups);
 }
 
@@ -382,7 +407,7 @@ if ($strict_user) {
 	$fields = array ('tagente.id_agente','tagente.id_grupo','tagente.id_os','tagente.ultimo_contacto','tagente.intervalo','tagente.comentarios description','tagente.quiet',
 		'tagente.normal_count','tagente.warning_count','tagente.critical_count','tagente.unknown_count','tagente.notinit_count','tagente.total_count','tagente.fired_count');
 	
-	$acltags = tags_get_user_module_and_tags ($config['id_user'], 'AR', $strict_user);
+	$acltags = tags_get_user_module_and_tags ($config['id_user'], $access, $strict_user);
 	
 	$total_agents = tags_get_all_user_agents (false, $config['id_user'], $acltags, $count_filter, $fields, false, $strict_user, true);
 	$total_agents = count($total_agents);
@@ -396,7 +421,7 @@ else {
 		'id_grupo' => $groups,
 		'search' => $search_sql,
 		'status' => $status),
-		array ('COUNT(*) as total'), 'AR', false);
+		array ('COUNT(*) as total'), $access, false);
 	$total_agents = isset ($total_agents[0]['total']) ?
 		$total_agents[0]['total'] : 0;
 	
@@ -423,7 +448,7 @@ else {
 			'notinit_count',
 			'total_count',
 			'fired_count'),
-		'AR',
+		$access,
 		$order);
 }
 
@@ -521,7 +546,7 @@ foreach ($agents as $agent) {
 	if ($agent['quiet']) {
 		$data[0] .= html_print_image("images/dot_green.disabled.png", true, array("border" => '0', "title" => __('Quiet'), "alt" => "")) . "&nbsp;";
 	}
-	$data[0] .= ui_print_agent_name($agent["id_agente"], true, 60, 'font-size:6.5pt !important;', true);
+	$data[0] .= ui_print_agent_name($agent["id_agente"], true, 60, 'font-size:8pt !important;', true);
 	$data[0] .= '</span>';
 	$data[0] .= '<div class="agentleft_' . $agent["id_agente"] . '" style="visibility: hidden; clear: left;">';
 	$data[0] .= '<a href="index.php?sec=estado&sec2=operation/agentes/ver_agente&id_agente='.$agent["id_agente"].'">'.__('View').'</a>';
@@ -535,7 +560,7 @@ foreach ($agents as $agent) {
 	
 	$data[2] = ui_print_os_icon ($agent["id_os"], false, true);
 	
-	$data[3] = human_time_description_raw($agent["intervalo"]);
+	$data[3] = '<span style="font-size:6.5pt;">'.human_time_description_raw($agent["intervalo"])."</span>";
 	
 	$data[4] = ui_print_group_icon ($agent["id_grupo"], true);
 	

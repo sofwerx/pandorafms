@@ -288,6 +288,19 @@ $table->data['form_agents_1'][3] = __('Select all modules of this group') . ' ' 
 		'', 'style="margin-right: 40px;"', true);
 
 
+$table->rowclass['form_modules_3'] = '';
+$table->data['form_modules_3'][0] = __('Module Status');
+$table->colspan['form_modules_3'][1] = 2;
+$status_list = array ();
+$status_list[AGENT_MODULE_STATUS_NORMAL] = __('Normal');
+$status_list[AGENT_MODULE_STATUS_WARNING] = __('Warning');
+$status_list[AGENT_MODULE_STATUS_CRITICAL_BAD] = __('Critical');
+$status_list[AGENT_MODULE_STATUS_UNKNOWN] = __('Unknown');
+$status_list[AGENT_MODULE_STATUS_NOT_NORMAL] = __('Not normal');
+$status_list[AGENT_MODULE_STATUS_NOT_INIT] = __('Not init');
+$table->data['form_modules_3'][1] = html_print_select($status_list,
+	'status_module', 'selected', '', __('All'), AGENT_MODULE_STATUS_ALL, true);
+$table->data['form_modules_3'][3] = '';
 
 $table->rowstyle['form_modules_2'] = 'vertical-align: top;';
 $table->rowclass['form_modules_2'] = 'select_modules_row select_modules_row_2';
@@ -304,10 +317,8 @@ $table->data['form_modules_2'][2] .= html_print_select (
 $table->data['form_modules_2'][3] = html_print_select (array(), 'agents[]',
 	$agents_select, false, __('None'), 0, true, true, false);
 
-
-
 $table->rowclass['form_agents_2'] = 'select_agents_row';
-$table->data['form_agents_2'][0] = __('Status');
+$table->data['form_agents_2'][0] = __('Agent Status');
 $table->colspan['form_agents_2'][1] = 2;
 $status_list = array ();
 $status_list[AGENT_STATUS_NORMAL] = __('Normal');
@@ -333,7 +344,7 @@ $table->data['form_agents_3'][2] = __('When select agents');
 $table->data['form_agents_3'][2] .= '<br>';
 $table->data['form_agents_3'][2] .= html_print_select (
 	array('common' => __('Show common modules'),
-		'all' => __('Show all modules')),
+		'all' => __('Show all modules'),'unknown' => __('Show unknown and not init modules')),
 	'modules_selection_mode',
 	'common', false, '', '', true);
 $table->data['form_agents_3'][3] = html_print_select (array(), 'module[]',
@@ -350,7 +361,7 @@ $table->data['edit1'][1] = '<table width="100%">';
 		$table->data['edit1'][1] .= '</td>';
 		$table->data['edit1'][1] .= '<td align="right">';
 			$table->data['edit1'][1] .= html_print_input_text(
-				'min_warning', '', '', 5, 15, true);
+				'min_warning', '', '', 5, 255, true);
 		$table->data['edit1'][1] .= '</td>';
 	$table->data['edit1'][1] .= '</tr>';
 	$table->data['edit1'][1] .= '<tr>';
@@ -359,7 +370,7 @@ $table->data['edit1'][1] = '<table width="100%">';
 		$table->data['edit1'][1] .= '</td>';
 		$table->data['edit1'][1] .= '<td align="right">';
 			$table->data['edit1'][1] .= html_print_input_text (
-				'max_warning', '', '', 5, 15, true);
+				'max_warning', '', '', 5, 255, true);
 		$table->data['edit1'][1] .= '</td>';
 	$table->data['edit1'][1] .= '</tr>';
 	$table->data['edit1'][1] .= '<tr>';
@@ -368,7 +379,7 @@ $table->data['edit1'][1] = '<table width="100%">';
 		$table->data['edit1'][1] .= '</td>';
 		$table->data['edit1'][1] .= '<td align="right">';
 			$table->data['edit1'][1] .= html_print_input_text (
-				'str_warning', '', '', 5, 15, true);
+				'str_warning', '', '', 5, 255, true);
 		$table->data['edit1'][1] .= '</td>';
 	$table->data['edit1'][1] .= '</tr>';
 	$table->data['edit1'][1] .= '<tr>';
@@ -396,7 +407,7 @@ $table->data['edit1'][3] = '<table width="100%">';
 		$table->data['edit1'][3] .= '</td>';
 		$table->data['edit1'][3] .= '<td align="right">';
 			$table->data['edit1'][3] .= html_print_input_text(
-				'min_critical', '', '', 5, 15, true);
+				'min_critical', '', '', 5, 255, true);
 		$table->data['edit1'][3] .= '</td>';
 	$table->data['edit1'][3] .= '</tr>';
 	$table->data['edit1'][3] .= '<tr>';
@@ -405,7 +416,7 @@ $table->data['edit1'][3] = '<table width="100%">';
 		$table->data['edit1'][3] .= '</td>';
 		$table->data['edit1'][3] .= '<td align="right">';
 			$table->data['edit1'][3] .= html_print_input_text(
-				'max_critical', '', '', 5, 15, true);
+				'max_critical', '', '', 5, 255, true);
 		$table->data['edit1'][3] .= '</td>';
 	$table->data['edit1'][3] .= '</tr>';
 	$table->data['edit1'][3] .= '<tr>';
@@ -414,7 +425,7 @@ $table->data['edit1'][3] = '<table width="100%">';
 		$table->data['edit1'][3] .= '</td>';
 		$table->data['edit1'][3] .= '<td align="right">';
 			$table->data['edit1'][3] .= html_print_input_text(
-				'str_critical', '', '', 5, 15, true);
+				'str_critical', '', '', 5, 255, true);
 		$table->data['edit1'][3] .= '</td>';
 	$table->data['edit1'][3] .= '</tr>';
 	$table->data['edit1'][3] .= '<tr>';
@@ -457,9 +468,17 @@ $table->data['edit3'][2] = __('SMNP community');
 $table->data['edit3'][3] = html_print_input_text ('snmp_community', '',
 	'', 10, 15, true);
 
+$target_ip_values = array();
+$target_ip_values['auto']      = __('Auto');
+$target_ip_values['force_pri'] = __('Force primary key');
+$target_ip_values['custom']    = __('Custom');
+
 $table->data['edit35'][0] = __('Target IP');
-$table->data['edit35'][1] = html_print_input_text ('ip_target', '', '',
-	15, 60, true);
+$table->data['edit35'][1] = html_print_select ($target_ip_values,
+	'ip_target', '', '', __('No change'), '', true, false, false, '', false, 'width:200px;');
+
+$table->data['edit35'][1] .= html_print_input_text ('custom_ip_target', '', '', 15, 60, true);
+
 $table->data['edit35'][2] = __('SNMP version');
 $table->data['edit35'][3] = html_print_select ($snmp_versions,
 	'tcp_send', '', '', __('No change'), '', true, false, false, '');
@@ -547,7 +566,7 @@ if ($table->rowspan['edit10'][0] == 2) {
 else {
 	$table->rowspan['edit10'][0] = $table->rowspan['edit10'][1] = 2;
 }
-$table->data['edit102'][2] = __('Throw unknown events');
+$table->data['edit102'][2] = __('Discard unknown events');
 
 $table->data['edit102'][3] = html_print_select(
 	array('' => __('No change'),
@@ -624,6 +643,7 @@ $(document).ready (function () {
 		}
 	});
 	
+	$("#text-custom_ip_target").hide();
 	
 	$("#id_agents").change(agent_changed_by_multiple_agents);
 	$("#module_name").change(module_changed_by_multiple_modules);
@@ -684,6 +704,10 @@ $(document).ready (function () {
 		if (this.value != '0')
 			params['id_tipo_modulo'] = this.value;
 		
+		var status_module = $('#status_module').val();
+		if (status_module != '-1')
+			params['status_module'] = status_module;
+		
 		$("#module_loading").show ();
 		$("tr#delete_table-edit1, tr#delete_table-edit2").hide ();
 		$("#module_name").attr ("disabled", "disabled")
@@ -701,6 +725,7 @@ $(document).ready (function () {
 			"json"
 		);
 	});
+	
 	function show_form() {
 		$("td#delete_table-0-1, " +
 			"td#delete_table-edit1-1, " +
@@ -869,16 +894,17 @@ $(document).ready (function () {
 	$("#id_agents").change (show_form);
 	
 	$("#form_edit input[name=selection_mode]").change (function () {
-		selector = this.value;
+		selector = $("#form_edit input[name=selection_mode]:checked").val();
 		clean_lists();
 		
 		if(selector == 'agents') {
-			$(".select_modules_row").css('display', 'none');
-			$(".select_agents_row").css('display', '');
+			$(".select_modules_row").hide();
+			$(".select_agents_row").show();
+			$("#groups_select").trigger("change");
 		}
 		else if(selector == 'modules') {
-			$(".select_agents_row").css('display', 'none');
-			$(".select_modules_row").css('display', '');
+			$(".select_agents_row").hide();
+			$(".select_modules_row").show();
 		}
 	});
 	
@@ -888,6 +914,15 @@ $(document).ready (function () {
 		}
 		else {
 			$("tr#delete_table-edit36, tr#delete_table-edit37, tr#delete_table-edit38").hide();
+		}
+	});
+
+	$('#ip_target').change(function() {
+		if($(this).val() == 'custom') {
+			$("#text-custom_ip_target").show();	
+		}
+		else{
+			$("#text-custom_ip_target").hide();	
 		}
 	});
 
@@ -965,6 +1000,17 @@ $(document).ready (function () {
 	$("#status_agents").change(function() {
 		$("#groups_select").trigger("change");
 	});
+	
+	$("#status_module").change(function() {
+		
+		selector = $("#form_edit input[name=selection_mode]:checked").val();
+		if(selector == 'agents') {
+			$("#id_agents").trigger("change");
+		}
+		else if(selector == 'modules') {
+			$("#module_type").trigger("change");
+		}
+	});
 });
 /* ]]> */
 </script>
@@ -990,7 +1036,7 @@ function process_manage_edit ($module_name, $agents_select = null) {
 		'id_export', 'history_data', 'critical_inverse',
 		'warning_inverse', 'critical_instructions',
 		'warning_instructions', 'unknown_instructions', 'policy_linked', 
-		'id_category', 'disabled_types_event', 'ip_target',
+		'id_category', 'disabled_types_event', 'ip_target', "custom_ip_target",
 		'descripcion', 'min_ff_event_normal', 'min_ff_event_warning',
 		'min_ff_event_critical', 'each_ff', 'module_ff_interval',
 		'ff_timeout', 'max_timeout');
@@ -1038,7 +1084,7 @@ function process_manage_edit ($module_name, $agents_select = null) {
 	if ($throw_unknown_events !== '') {
 		//Set the event type that can show.
 		$disabled_types_event = array(
-			EVENTS_GOING_UNKNOWN => (int)!$throw_unknown_events);
+			EVENTS_GOING_UNKNOWN => (int)$throw_unknown_events);
 		$values['disabled_types_event'] = json_encode($disabled_types_event);
 	}
 	

@@ -57,7 +57,7 @@ if (file_exists ('../../include/languages/'.$user_language.'.mo')) {
 echo '<link rel="stylesheet" href="../../include/styles/pandora.css" type="text/css"/>';
 
 $label = get_parameter('label');
-$label = base64_decode($label);
+$label_title = base64_decode($label);
 $id = get_parameter('id');
 //$label = rawurldecode(urldecode(base64_decode(get_parameter('label', ''))));
 ?>
@@ -74,7 +74,7 @@ $id = get_parameter('id');
 		}
 		?>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-		<title>Pandora FMS Graph (<?php echo modules_get_agentmodule_agent_name ($id) . ' - ' . $label; ?>)</title>
+		<title>Pandora FMS Graph (<?php echo modules_get_agentmodule_agent_name ($id) . ' - ' . $label_title; ?>)</title>
 		<link rel="stylesheet" href="../../include/styles/pandora_minimal.css" type="text/css" />
 		<link rel="stylesheet" href="../../include/styles/jquery-ui-1.10.0.custom.css" type="text/css" />
 		<script type='text/javascript' src='../../include/javascript/pandora.js'></script>
@@ -91,11 +91,11 @@ $id = get_parameter('id');
 			};
 			
 			function show_others() {
-				if (!$("#checkbox-avg_only").attr('checked')) {
-					$("#hidden-show_other").val(0);
+				if ($('#checkbox-avg_only').is(":checked") == true) {
+					$("#hidden-show_other").val(1);
 				}
 				else {
-					$("#hidden-show_other").val(1);
+					$("#hidden-show_other").val(0);
 				}
 			}
 			//-->
@@ -134,11 +134,19 @@ $id = get_parameter('id');
 		}
 		
 		$draw_alerts = get_parameter("draw_alerts", 0);
-		$avg_only = get_parameter ("avg_only", 1);
-		$show_other = (bool)get_parameter('show_other', false);
-		if ($show_other) {
+
+		if(isset($config['only_average'])){
+			$avg_only = 1;
+		} 
+		else {
 			$avg_only = 0;
 		}
+
+		$show_other = get_parameter('show_other');
+		if (isset($show_other)) {
+			$avg_only = $show_other;
+		}
+
 		$period = get_parameter ("period", SECONDS_1DAY);
 		$id = get_parameter ("id", 0);
 		$width = get_parameter ("width", STATWIN_DEFAULT_CHART_WIDTH);
@@ -196,7 +204,7 @@ $id = get_parameter('id');
 		switch ($graph_type) {
 			case 'boolean':
 				echo grafico_modulo_boolean ($id, $period, $draw_events,
-					$width, $height, $label, $unit, $draw_alerts,
+					$width, $height, $label_title, $unit, $draw_alerts,
 					$avg_only, false, $date, false, $urlImage,
 					'adapter_' . $graph_type, $time_compare,
 					$unknown_graph);
@@ -208,7 +216,7 @@ $id = get_parameter('id');
 				break;
 			case 'sparse':
 				echo grafico_modulo_sparse ($id, $period, $draw_events,
-					$width, $height, $label, $unit, $draw_alerts,
+					$width, $height, $label_title, $unit, $draw_alerts,
 					$avg_only, false, $date, $unit, $baseline, 0, true,
 					false, $urlImage, 1, false,
 					'adapter_' . $graph_type, $time_compare,
@@ -222,7 +230,7 @@ $id = get_parameter('id');
 				break;
 			case 'string':
 				echo grafico_modulo_string ($id, $period, $draw_events,
-					$width, $height, $label, null, $draw_alerts, 1,
+					$width, $height, $label_title, null, $draw_alerts, 1,
 					false, $date, false, $urlImage,
 					'adapter_' . $graph_type);
 				echo '<br>';
@@ -233,7 +241,7 @@ $id = get_parameter('id');
 				break;
 			case 'log4x':
 				echo grafico_modulo_log4x ($id, $period, $draw_events,
-					$width, $height, $label, $unit, $draw_alerts, 1,
+					$width, $height, $label_title, $unit, $draw_alerts, 1,
 					$pure, $date);
 				echo '<br>';
 				if ($show_events_graph)

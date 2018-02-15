@@ -162,7 +162,7 @@ function slicesbar_graph($chart_data, $period, $width, $height, $colors,
 	
 	$id_graph = serialize_in_temp($graph, null, $ttl);
 	
-	return "<img src='".$home_url."include/graphs/functions_pchart.php?static_graph=1&graph_type=slicebar&ttl=".$ttl."&id_graph=".$id_graph."'>";
+	return "<img src='".$home_url."include/graphs/functions_pchart.php?static_graph=1&graph_type=slicebar&ttl=".$ttl."&id_graph=".$id_graph."' style='width:100%;'>";
 }
 
 function vbar_graph($flash_chart, $chart_data, $width, $height,
@@ -179,7 +179,7 @@ function vbar_graph($flash_chart, $chart_data, $width, $height,
 	if ($flash_chart) {
 		return flot_vcolumn_chart ($chart_data, $width, $height, $color,
 			$legend, $long_index, $homeurl, $unit, $water_mark_url,
-			$homedir);
+			$homedir,$font,$font_size);
 	}
 	else {
 		$graph = array();
@@ -263,7 +263,10 @@ function area_graph($flash_chart, $chart_data, $width, $height, $color,
 			$backgroundColor,
 			$dashboard,
 			$vconsole,
-			$agent_module_id);
+			$agent_module_id,
+			$font,
+			$font_size,
+			$xaxisname);
 	}
 	else {
 		$graph = array();
@@ -316,6 +319,8 @@ function stacked_area_graph($flash_chart, $chart_data, $width, $height,
 			$legend,
 			$long_index,
 			$homeurl,
+			$font,
+			$font_size,
 			$unit,
 			$water_mark_url,
 			array(),
@@ -378,6 +383,8 @@ function stacked_line_graph($flash_chart, $chart_data, $width, $height,
 			$legend,
 			$long_index,
 			$homeurl,
+			$font,
+			$font_size,
 			$unit,
 			$water_mark_url,
 			array(),
@@ -503,7 +510,8 @@ function line_graph($flash_chart, $chart_data, $width, $height, $color,
 	$legend, $long_index, $no_data_image, $xaxisname = "",
 	$yaxisname = "", $water_mark = "", $font = '', $font_size = '',
 	$unit = '', $ttl = 1, $homeurl = '', $backgroundColor = 'white',
-	$dashboard = false, $vconsole = false) {
+	$dashboard = false, $vconsole = false, $series_type = array(),
+	$percentil_values = array()) {
 	
 	include_once("functions_flot.php");
 	
@@ -524,9 +532,11 @@ function line_graph($flash_chart, $chart_data, $width, $height, $color,
 			$legend,
 			$long_index,
 			$homeurl,
+			$font,
+			$font_size,
 			$unit,
 			$water_mark_url,
-			array(),
+			$series_type,
 			array(),
 			0,
 			0,
@@ -536,7 +546,9 @@ function line_graph($flash_chart, $chart_data, $width, $height, $color,
 			$menu,
 			$backgroundColor,
 			$dashboard,
-			$vconsole);
+			$vconsole,
+			false,
+			$percentil_values);
 	}
 	else {
 		$graph = array();
@@ -603,7 +615,7 @@ function hbar_graph($flash_chart, $chart_data, $width, $height,
 	
 	if ($flash_chart) {
 		return flot_hcolumn_chart(
-			$chart_data, $width, $height, $water_mark_url);
+			$chart_data, $width, $height, $water_mark_url, $font, $font_size);
 	}
 	else {
 		$graph = array();

@@ -21,8 +21,11 @@ global $config;
 check_login ();
 
 enterprise_hook('open_meta_frame');
-
-if (! check_acl ($config['id_user'], 0, "RR")) {
+$report_r = check_acl ($config['id_user'], 0, "RR");
+$report_w = check_acl ($config['id_user'], 0, "RW");
+$report_m = check_acl ($config['id_user'], 0, "RM");
+$access = ($report_r == true) ? 'RR' : (($report_w == true) ? 'RW' : (($report_m == true) ? 'RM' : 'RR'));
+if (!$report_r  && !$report_w && !$report_m) {
 	db_pandora_audit("ACL Violation",
 		"Trying to access report builder");
 	require ("general/noaccess.php");
@@ -427,15 +430,15 @@ switch ($action) {
 		$table_aux->colspan[0][0] = 4;
 		$table_aux->data[0][0] = "<b>". __("Group") . "</b>";
 		
-		$table_aux->data[0][1] = html_print_select_groups(false, "AR", true, 'id_group', $id_group, '', '', '', true, false, true, '', false, 'width:150px', false, false, 'id_grupo', $strict_user). '<br>';
+		$table_aux->data[0][1] = html_print_select_groups(false, $access, true, 'id_group', $id_group, '', '', '', true, false, true, '', false, 'width:150px', false, false, 'id_grupo', $strict_user). '<br>';
 		
 		$table_aux->data[0][2] = "<b>". __("Free text for search: ") . ui_print_help_tip(
-	__('Search by report name or description, list matches.'),true) . "</b>";
+		__('Search by report name or description, list matches.'),true) . "</b>";
 		$table_aux->data[0][3] = html_print_input_text ("search", $search, '', 30, '', true);
 		
 		$table_aux->data[0][6] = html_print_submit_button(__('Search'), 'search_submit', false, 'class="sub upd"', true);
 		
-		if (defined('METACONSOLE')) {
+		if (is_metaconsole()) {
 			$filter = "<form class ='' action='index.php?sec=reporting&sec2=godmode/reporting/reporting_builder&id_group=$id_group&pure=$pure'
 				method='post'>";
 			$filter .= html_print_table($table_aux,true);
@@ -449,12 +452,10 @@ switch ($action) {
 			echo "</form>";
 		}
 		
-		
 		ui_require_jquery_file ('pandora.controls');
 		ui_require_jquery_file ('ajaxqueue');
 		ui_require_jquery_file ('bgiframe');
 		ui_require_jquery_file ('autocomplete');
-		
 		
 		// Show only selected groups
 		if ($id_group > 0) {
@@ -465,7 +466,7 @@ switch ($action) {
 		}
 		
 		$own_info = get_user_info ($config['id_user']);
-		if ($own_info['is_admin'] || check_acl ($config['id_user'], 0, "PM"))
+		if ($own_info['is_admin'] || check_acl ($config['id_user'], 0, "RM"))
 			$return_all_group = true;
 		else
 			$return_all_group = false;
@@ -505,10 +506,10 @@ switch ($action) {
 				'private',
 				'id_user',
 				'id_group',
-				'non_interactive'), $return_all_group, 'RR', $group, $strict_user);
+				'non_interactive'), $return_all_group, $access, $group, $strict_user);
 		
 		$total_reports = (int) count(reports_get_reports ($filter,
-			array ('name'), $return_all_group, 'RR', $group, $strict_user));
+			array ('name'), $return_all_group, $access, $group, $strict_user));
 		
 		
 		if (sizeof ($reports)) {
@@ -579,15 +580,19 @@ switch ($action) {
 				
 				if (!is_user_admin ($config["id_user"])) {
 					if ($report["private"] && $report["id_user"] != $config['id_user'])
-						if (!check_acl ($config["id_user"], $report["id_group"], "RR"))
+						if (!check_acl ($config["id_user"], $report["id_group"], "RR") && 
+								!check_acl ($config["id_user"], $report["id_group"], "RW") 
+								&& !check_acl ($config["id_user"], $report["id_group"], "RM"))
 							continue;
-					if (!check_acl ($config["id_user"], $report["id_group"], "RR"))
+					if (!check_acl ($config["id_user"], $report["id_group"], "RR") && 
+							!check_acl ($config["id_user"], $report["id_group"], "RW") 
+								&& !check_acl ($config["id_user"], $report["id_group"], "RM"))
 						continue;
 				}
 				
 				$data = array ();
 				
-				if (check_acl ($config["id_user"], $report["id_group"], "RW")) {
+				if (check_acl ($config["id_user"], $report["id_group"], "RW") || check_acl ($config["id_user"], $report["id_group"], "RM")) {
 					$data[0] = '<a href="' . $config['homeurl'] . 'index.php?sec=reporting&sec2=godmode/reporting/reporting_builder&action=edit&id_report='.
 						$report['id_report'].'&pure='.$pure.'">'.$report['name'].'</a>';
 				}
@@ -721,7 +726,7 @@ switch ($action) {
 		else {
 			ui_print_info_message ( array ( 'no_close' => true, 'message' =>  __('No data found.') ) );
 		}
-		if (check_acl ($config['id_user'], 0, "RW")) {
+		if (check_acl ($config['id_user'], 0, "RW") || check_acl ($config['id_user'], 0, "RM")) {
 			echo '<form method="post" action="index.php?sec=reporting&sec2=godmode/reporting/reporting_builder&tab=main&action=new&pure='.$pure.'">';
 			if (defined("METACONSOLE"))
 				echo '<div class="action-buttons" style="width: 100%; ">';
@@ -895,9 +900,19 @@ switch ($action) {
 					case 'update':
 						$values = array();
 						$values['id_report'] = $idReport;
-						$values['name'] = (string) get_parameter('name');
+						//$values['name'] = (string) get_parameter('name');
 						$values['description'] = get_parameter('description');
 						$values['type'] = get_parameter('type', null);
+						$label = get_parameter('label', '');
+						
+						//Add macros name
+						$items_label = array();
+						$items_label['type'] = get_parameter('type');
+						$items_label['id_agent'] = get_parameter('id_agent');
+						$items_label['id_agent_module'] = get_parameter('id_agent_module');
+						$name_it = (string) get_parameter('name');
+						$values['name'] = reporting_label_macro($items_label, $name_it);
+
 						// Added support for projection graphs, prediction date and SLA reports
 						// 'top_n_value','top_n' and 'text' fields will be reused for these types of report
 						switch ($values['type']) {
@@ -921,8 +936,11 @@ switch ($action) {
 								$values['text'] = $intervals;
 								break;
 							case 'SLA_monthly':
+							case 'SLA_weekly':
+							case 'SLA_hourly':
 							case 'SLA_services':
 							case 'SLA':
+							case 'availability_graph':
 								$values['period'] = get_parameter('period');
 								$values['top_n'] = get_parameter('combo_sla_sort_options',0);
 								$values['top_n_value'] = get_parameter('quantity');
@@ -1041,6 +1059,7 @@ switch ($action) {
 						$filter_event_no_validated = get_parameter('filter_event_no_validated', 0);
 						$filter_event_critical = get_parameter('filter_event_critical', 0);
 						$filter_event_warning = get_parameter('filter_event_warning', 0);
+						$filter_event_type = get_parameter('filter_event_type', '');
 						
 						$event_graph_by_agent = get_parameter('event_graph_by_agent', 0);
 						$event_graph_by_user_validator = get_parameter('event_graph_by_user_validator', 0);
@@ -1101,6 +1120,7 @@ switch ($action) {
 						$style = array();
 						$style['show_in_two_columns'] = get_parameter('show_in_two_columns', 0);
 						$style['show_in_landscape'] = get_parameter('show_in_landscape', 0);
+						$style['hide_notinit_agents'] = get_parameter('hide_notinit_agents', 0);
 						
 						switch ($values['type']) {
 							case 'event_report_agent':
@@ -1110,7 +1130,7 @@ switch ($action) {
 								$style['filter_event_validated'] = $filter_event_validated;
 								$style['filter_event_critical'] = $filter_event_critical;
 								$style['filter_event_warning'] = $filter_event_warning;
-								
+								$style['filter_event_type'] = json_encode($filter_event_type);
 								$style['event_graph_by_agent'] = $event_graph_by_agent;
 								$style['event_graph_by_user_validator'] = $event_graph_by_user_validator;
 								$style['event_graph_by_criticity'] = $event_graph_by_criticity;
@@ -1121,12 +1141,46 @@ switch ($action) {
 										$style['event_filter_search'] =
 											$event_filter_search;
 										break;
+									case 'event_report_agent':
+										if ($label != '')
+											$style['label'] = $label;
+										else
+											$style['label'] = '';
+										break;
 								}
 								break;
 							case 'simple_graph':
 								// Warning. We are using this column to hold this value to avoid
 								// the modification of the database for compatibility reasons.
 								$style['only_avg'] = (int) get_parameter('only_avg');
+								$style['percentil_95'] = (int) get_parameter('percentil_95');
+								if ($label != '')
+									$style['label'] = $label;
+								else
+									$style['label'] = '';
+								break;
+							case 'agent_configuration':
+							case 'event_report_module':
+							case 'alert_report_agent':
+							case 'alert_report_module':
+							case 'historical_data':
+							case 'sumatory':
+							case 'database_serialized':
+							case 'monitor_report':
+							case 'min_value':
+							case 'max_value':
+							case 'avg_value':
+							case 'projection_graph':
+							case 'prediction_date':
+							case 'TTRT':
+							case 'TTO':
+							case 'MTBF':
+							case 'MTTR':
+							case 'simple_baseline_graph':
+								if ($label != '')
+									$style['label'] = $label;
+								else
+									$style['label'] = '';
 								break;
 						}
 						
@@ -1158,8 +1212,17 @@ switch ($action) {
 						$values = array();
 						$values['id_report'] = $idReport;
 						$values['type'] = get_parameter('type', null);
-						$values['name'] = (string) get_parameter('name');
+						//$values['name'] = (string) get_parameter('name');
 						$values['description'] = get_parameter('description');
+						$label = get_parameter('label', '');
+						
+						//Add macros name
+						$items_label = array();
+						$items_label['type'] = get_parameter('type');
+						$items_label['id_agent'] = get_parameter('id_agent');
+						$items_label['id_agent_module'] = get_parameter('id_agent_module');
+						$name_it = (string) get_parameter('name');
+						$values['name'] = reporting_label_macro($items_label, $name_it);
 						
 						// Support for projection graph, prediction date and SLA reports
 						// 'top_n_value', 'top_n' and 'text' fields will be reused for these types of report
@@ -1362,6 +1425,7 @@ switch ($action) {
 						$style = array();
 						$style['show_in_two_columns'] = get_parameter('show_in_two_columns', 0);
 						$style['show_in_landscape'] = get_parameter('show_in_landscape', 0);
+						$style['hide_notinit_agents'] = get_parameter('hide_notinit_agents', 0);
 						
 						switch ($values['type']) {
 							case 'event_report_agent':
@@ -1375,6 +1439,7 @@ switch ($action) {
 								$event_graph_by_user_validator = get_parameter('event_graph_by_user_validator', 0);
 								$event_graph_by_criticity = get_parameter('event_graph_by_criticity', 0);
 								$event_graph_validated_vs_unvalidated = get_parameter('event_graph_validated_vs_unvalidated', 0);
+								$filter_event_type = get_parameter('filter_event_type', '');
 								
 								$event_filter_search = get_parameter('filter_search', '');
 								
@@ -1383,6 +1448,7 @@ switch ($action) {
 								$style['filter_event_validated'] = $filter_event_validated;
 								$style['filter_event_critical'] = $filter_event_critical;
 								$style['filter_event_warning'] = $filter_event_warning;
+								$style['filter_event_type'] = json_encode($filter_event_type);
 								
 								$style['event_graph_by_agent'] = $event_graph_by_agent;
 								$style['event_graph_by_user_validator'] = $event_graph_by_user_validator;
@@ -1394,6 +1460,12 @@ switch ($action) {
 										$style['event_filter_search'] =
 											$event_filter_search;
 										break;
+									case 'event_report_agent':
+										if ($label != '')
+											$style['label'] = $label;
+										else
+											$style['label'] = '';
+										break;
 								}
 								
 								break;
@@ -1401,6 +1473,34 @@ switch ($action) {
 								// Warning. We are using this column to hold this value to avoid
 								// the modification of the database for compatibility reasons.
 								$style['only_avg'] = (int) get_parameter('only_avg');
+								$style['percentil_95'] = (int) get_parameter('percentil_95');
+								if ($label != '')
+									$style['label'] = $label;
+								else
+									$style['label'] = '';
+								break;
+							case 'agent_configuration':
+							case 'event_report_module':
+							case 'alert_report_agent':
+							case 'alert_report_module':
+							case 'historical_data':
+							case 'sumatory':
+							case 'database_serialized':
+							case 'monitor_report':
+							case 'min_value':
+							case 'max_value':
+							case 'avg_value':
+							case 'projection_graph':
+							case 'prediction_date':
+							case 'TTRT':
+							case 'TTO':
+							case 'MTBF':
+							case 'MTTR':
+							case 'simple_baseline_graph':
+								if ($label != '')
+									$style['label'] = $label;
+								else
+									$style['label'] = '';
 								break;
 						}
 						
@@ -1872,10 +1972,19 @@ else {
 		"reporting_" . $activeTab . "_tab", false, $buttons);
 }
 
-
-
 if ($resultOperationDB !== null) {
-	ui_print_result_message ($resultOperationDB, __('Successfull action'), __('Unsuccessfull action'));
+	$err = '';
+	switch ($_POST['type']) {
+		case 'custom_graph':
+			$err.='You must enter custom graph';
+			break;
+		case 'SLA':
+			$err.='You must enter some character in SLA limit field';
+		default:
+			$err.='';
+			break;
+	}
+	ui_print_result_message ($resultOperationDB, __('Successfull action'), __('Unsuccessfull action<br><br>'.$err));
 }
 
 switch ($activeTab) {

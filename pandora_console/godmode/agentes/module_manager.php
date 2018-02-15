@@ -29,9 +29,17 @@ require_once ('include/functions_servers.php');
 
 $search_string = io_safe_output(urldecode(trim(get_parameter ("search_string", ""))));
 
+global $policy_page;
+
+if (!isset($policy_page))
+	$policy_page = false;
+
 // Search string filter form
 //echo '<form id="create_module_type" method="post" action="index.php?sec=gagente&sec2=godmode/agentes/configurar_agente&tab=module&id_agente='.$id_agente.'">';
-echo '<form id="create_module_type" method="post" action="'.$url.'">';
+if (($policy_page) || (isset($agent)))
+	echo '<form id="" method="post" action="">';
+else
+	echo '<form id="create_module_type" method="post" action="'.$url.'">';
 echo '<table width="100%" cellpadding="2" cellspacing="2" class="databox filters" >';
 echo "<tr><td class='datos' style='width:20%; font-weight: bold;'>";
 echo __('Search') . ' ' .
@@ -41,7 +49,7 @@ echo "<td class='datos' style='width:20%'>";
 html_print_submit_button (__('Filter'), 'filter', false, 'class="sub search"');
 echo "</td>";
 echo "<td class='datos' style='width:20%'></td>";
-//echo '</form>';
+echo '</form>';
 // Check if there is at least one server of each type available to assign that
 // kind of modules. If not, do not show server type in combo
 
@@ -92,14 +100,7 @@ if (strstr($sec2, "enterprise/godmode/policies/policies") !== false) {
 	unset($modules['predictionserver']);
 }
 
-global $policy_page;
-
-if (!isset($policy_page))
-	$policy_page = false;
-
 $show_creation = false;
-
-echo "</form>";
 
 if (($policy_page) || (isset($agent))) {
 	if ($policy_page) {
@@ -288,7 +289,7 @@ $sortField = get_parameter('sort_field');
 $sort = get_parameter('sort', 'none');
 $selected = 'border: 1px solid black;';
 
-$order[] = array('field' => 'id_module_group', 'order' => 'ASC');
+$order[] = array('field' => 'tmodule_group.name', 'order' => 'ASC');
 
 switch ($sortField) {
 	case 'name':
@@ -451,7 +452,9 @@ switch ($config["dbtype"]) {
 		}
 		$sql = sprintf("SELECT %s
 			FROM tagente_modulo
-			WHERE %s %s %s %s %s", 
+			LEFT JOIN tmodule_group
+			ON tagente_modulo.id_module_group = tmodule_group.id_mg
+			WHERE %s %s %s %s %s",
 			$params, $basic_where, $where, $where_tags, $order_sql, $limit_sql);
 		
 		$modules = db_get_all_rows_sql($sql);
@@ -464,7 +467,9 @@ switch ($config["dbtype"]) {
 		}
 		$sql = sprintf("SELECT %s
 			FROM tagente_modulo
-			WHERE %s %s %s %s", 
+			LEFT JOIN tmodule_group
+			ON tmodule_group.id_mg = tagente_modulo.id_module_group
+			WHERE %s %s %s %s",
 			$params, $basic_where, $where, $where_tags, $order_sql);
 		$modules = oracle_recode_query ($sql, $set, 'AND', false);
 		break;

@@ -1061,7 +1061,12 @@ function api_set_update_agent($id_agent, $thrash2, $other, $thrash3) {
 			'id_parent' => $idParent,
 			'custom_id' => $customId),
 		array('id_agente' => $id_agent));
-	
+
+	if ( $return && !empty($ip)) {
+		// register ip for this agent in 'taddress'
+		agents_add_address ($id_agent, $ip);
+	}
+
 	returnData('string',
 		array('type' => 'string', 'data' => (int)((bool)$return)));
 }
@@ -1154,7 +1159,12 @@ function api_set_new_agent($thrash1, $thrash2, $other, $thrash3) {
 				'server_name' => $nameServer,
 				'id_parent' => $idParent,
 				'custom_id' => $customId));
-		
+
+		if (!empty($idAgente) && !empty($ip)) {
+			// register ip for this agent in 'taddress'
+			agents_add_address ($idAgente, $ip);
+		}
+
 		returnData('string',
 			array('type' => 'string', 'data' => $idAgente));
 	}
@@ -5736,6 +5746,46 @@ function api_set_update_group($id_group, $thrash2, $other, $thrash3) {
 }
 
 /**
+ * Delete a group 
+ * 
+ * @param integer $id Group ID
+ * @param $thrash1 Don't use.
+ * @param $thrast2 Don't use.
+ * @param $thrash3 Don't use.
+ */
+function api_set_delete_group($id_group, $thrash2, $other, $thrash3) {
+	global $config;
+
+	if (defined ('METACONSOLE')) {
+		return;
+	}
+
+	$group = db_get_row_filter('tgrupo', array('id_grupo' => $id_group));
+	if (!$group) {
+		returnError('error_delete', 'Error in delete operation. Id does not exist.');
+		return;
+	}
+
+	$usedGroup = groups_check_used($id_group);
+	if ($usedGroup['return']) {
+		returnError('error_delete',
+			 'Error in delete operation. The group is not empty (used in ' .
+			 implode(', ', $usedGroup['tables']) . ').' );
+		return;
+	}
+
+	db_process_sql_update('tgrupo', array('parent' => $group['parent']), array('parent' => $id_group));
+	db_process_sql_delete('tgroup_stat', array('id_group' => $id_group));
+
+	$result = db_process_sql_delete('tgrupo', array('id_grupo' => $id_group));
+
+	if (!$result)
+		returnError('error_delete', 'Error in delete operation.');
+	else
+		returnData('string', array('type' => 'string', 'data' => __('Correct Delete')));
+}
+
+/**
  * Create a new netflow filter. And return the id_group of the new group. 
  * 
  * @param $thrash1 Don't use.
@@ -5816,11 +5866,11 @@ function api_set_create_netflow_filter($thrash1, $thrash2, $other, $thrash3) {
  * 
  * @param integer $id The ID of module in DB. 
  * @param $thrash1 Don't use.
- * @param array $other it's array, $other as param is <separator>;<period> in this order
+ * @param array $other it's array, $other as param is <separator>;<period>;<tstart>;<tend> in this order
  *  and separator char (after text ; ) and separator (pass in param othermode as othermode=url_encode_separator_<separator>)
  *  example:
  *  
- *  api.php?op=get&op2=module_data&id=17&other=;|604800&other_mode=url_encode_separator_|
+ *  api.php?op=get&op2=module_data&id=17&other=;|604800|20161201T13:40|20161215T13:40&other_mode=url_encode_separator_|
  *  
  * @param $returnType Don't use.
  */
@@ -5829,14 +5879,42 @@ function api_get_module_data($id, $thrash1, $other, $returnType) {
 		return;
 	}
 	
-	$separator = $other['data'][0];
-	$periodSeconds = $other['data'][1];
-	
-	$sql = sprintf ("SELECT utimestamp, datos 
-		FROM tagente_datos 
-		WHERE id_agente_modulo = %d AND utimestamp > %d 
-		ORDER BY utimestamp DESC", $id, get_system_time () - $periodSeconds);
-	
+	$data = explode("|", $other['data']);
+	$separator = $data[0];
+	$periodSeconds = $data[1];
+	$tstart = $data[2];
+	$tend = $data[3];
+
+	$dateStart = explode("T", $tstart);
+	$dateYearStart = substr($dateStart[0], 0, 4);
+	$dateMonthStart = substr($dateStart[0], 4, 2);
+	$dateDayStart = substr($dateStart[0], 6, 2);
+	$date_start = $dateYearStart . "-" . $dateMonthStart . "-" . $dateDayStart . " " . $dateStart[1];
+	$date_start = new DateTime($date_start);
+	$date_start = $date_start->format('U');
+
+	$dateEnd = explode("T", $tend);
+	$dateYearEnd = substr($dateEnd[0], 0, 4);
+	$dateMonthEnd = substr($dateEnd[0], 4, 2);
+	$dateDayEnd = substr($dateEnd[0], 6, 2);
+	$date_end = $dateYearEnd . "-" . $dateMonthEnd . "-" . $dateDayEnd . " " . $dateEnd[1];
+	$date_end = new DateTime($date_end);
+	$date_end = $date_end->format('U');
+
+	if (($tstart != "") && ($tend != "")) {
+		$sql = sprintf ("SELECT utimestamp, datos 
+			FROM tagente_datos 
+			WHERE id_agente_modulo = %d AND utimestamp > %d 
+			AND utimestamp < %d 
+			ORDER BY utimestamp DESC", $id, $date_start, $date_end);
+	}
+	else {
+		$sql = sprintf ("SELECT utimestamp, datos 
+			FROM tagente_datos 
+			WHERE id_agente_modulo = %d AND utimestamp > %d 
+			ORDER BY utimestamp DESC", $id, get_system_time () - $periodSeconds);
+	}
+
 	$data['type'] = 'array';
 	$data['list_index'] = array('utimestamp', 'datos');
 	$data['data'] = db_get_all_rows_sql($sql);
@@ -8843,29 +8921,59 @@ function api_get_module_graph($id_module, $thrash2, $other, $thrash4) {
 		'', false, false, true, time(), '', 0, 0, true, true,
 		ui_get_full_url(false) . '/', 1, false, '', false, true);
 	
-	$graph_image_file_encoded = false;
-	
-	// Get the src of the html item
-	if (preg_match("/<img src='(.+)'.*/", $graph_html, $matches)) {
-		if (isset($matches) && isset($matches[1])) {
-			$file_url = $matches[1];
-			// Get the file
-			$graph_image_file = file_get_contents($file_url);
-			
-			if ($graph_image_file !== false) {
-				// Encode the file
-				$graph_image_file_encoded = base64_encode($graph_image_file);
-				unset($graph_image_file);
-			}
-		}
-	}
-	
-	if (empty($graph_image_file_encoded)) {
-		// returnError('error_module_graph', __(''));
-	}
-	else {
-		returnData('string', array('type' => 'string', 'data' => $graph_image_file_encoded));
-	}
+       $graph_image_file_encoded = false;
+        if (preg_match("/<img src='(.+)'./", $graph_html, $matches)) {
+                $file_url = $matches[1];
+
+                if (preg_match("/\?(.+)&(.+)&(.+)&(.+)/", $file_url,$parameters)) {
+                        array_shift ($parameters);
+                        foreach ($parameters as $parameter){
+                                $value = explode ("=",$parameter);
+
+                                if (strcmp($value[0], "static_graph") == 0){
+                                        $static_graph = $value[1];
+                                }
+                                elseif (strcmp($value[0], "graph_type") == 0){
+                                        $graph_type = $value[1];
+                                }
+                                elseif (strcmp($value[0], "ttl") == 0){
+                                        $ttl = $value[1];
+                                }
+                                elseif (strcmp($value[0], "id_graph") == 0){
+                                        $id_graph = $value[1];
+                                }
+                        }
+                }
+        }
+
+        // Check values are OK
+        if ( (isset ($graph_type))
+        && (isset ($ttl))
+        && (isset ($id_graph))) {
+                        $_GET["ttl"] = $ttl;
+                        $_GET["id_graph"] = $id_graph;
+                        $_GET["graph_type"] = $graph_type;
+                        $_GET["static_graph"] = $static_graph;
+        }
+
+        ob_start();
+        include (__DIR__ . "/graphs/functions_pchart.php");
+        $output =  ob_get_clean();
+
+        $graph_image_file_encoded = base64_encode($output);
+        if (empty($graph_image_file_encoded)) {
+                // returnError('error_module_graph', __(''));
+        }
+        else {
+			if($other['data'] < 40000){
+				header('Content-type: text/html');
+            	returnData('string', array('type' => 'string', 'data' => '<img src="data:image/jpeg;base64,' . $graph_image_file_encoded . '">'));
+        	} else {
+        		returnData('string', array('type' => 'string', 'data' => $graph_image_file_encoded));	
+        	}
+		// To show only the base64 code, call returnData as:
+        // returnData('string', array('type' => 'string', 'data' => $graph_image_file_encoded));
+        }
 }
 
 ?>

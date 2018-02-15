@@ -95,6 +95,9 @@ my %SWITCH_TO_SWITCH;
 # MAC addresses.
 my %MAC;
 
+# Parent-child relationships (in Pandora).
+my %PARENTS;
+
 # SNMP query cache.
 my %SNMP_CACHE;
 
@@ -1080,7 +1083,17 @@ sub connect_pandora_agents($$$$) {
 	}
 
 	# Update parents.
-	db_do($DBH, 'UPDATE tagente SET id_parent=? WHERE id_agente=?', $agent_2->{'id_agente'}, $agent_1->{'id_agente'});
+	if (!defined($PARENTS{$agent_2->{'id_agente'}}) &&
+	    (!defined($PARENTS{$agent_1->{'id_agente'}}) ||
+	    $PARENTS{$agent_1->{'id_agente'}} != $agent_2->{'id_agente'})) {
+		$PARENTS{$agent_2->{'id_agente'}} = $agent_1->{'id_agente'};
+		db_do($DBH, 'UPDATE tagente SET id_parent=? WHERE id_agente=?', $agent_1->{'id_agente'}, $agent_2->{'id_agente'});
+	} elsif (!defined($PARENTS{$agent_1->{'id_agente'}}) &&
+	    (!defined($PARENTS{$agent_2->{'id_agente'}}) ||
+	    $PARENTS{$agent_2->{'id_agente'}} != $agent_1->{'id_agente'})) {
+		$PARENTS{$agent_1->{'id_agente'}} = $agent_2->{'id_agente'};
+		db_do($DBH, 'UPDATE tagente SET id_parent=? WHERE id_agente=?', $agent_2->{'id_agente'}, $agent_1->{'id_agente'});
+	}
 }
 
 
@@ -1313,4 +1326,3 @@ foreach my $device (values(%VISITED_DEVICES)) {
 # Do not delete unused connections unless at least one connection has been found
 # (prevents the script from deleting connections if there has been a network outage).
 delete_unused_connections(\%CONF, $DBH, $TASK_ID,\%CONNECTIONS) if (scalar(keys(%CONNECTIONS)) > 0);
-

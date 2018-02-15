@@ -1073,7 +1073,7 @@ sub pandora_execute_action ($$$$$$$$$;$) {
 		# non-ascii chars should be encoded in UTF-8.
 		if ($field3 =~ /[^[:ascii:]]/o) {
 			$field3 = encode("UTF-8", $field3);
-			$content_type = 'text/html; charset="UTF-8"';
+			$content_type = 'text/plain; charset="UTF-8"';
 		}
 		
 		# Build the mail with attached content
@@ -2662,6 +2662,9 @@ sub pandora_create_module_from_hash ($$$) {
 	if (defined $parameters->{'id_network_component_group'}) {
 		delete $parameters->{'id_network_component_group'};
 	}
+	if (defined $parameters->{'timestamp'}) {
+		delete $parameters->{'timestamp'};
+	}
 
 	# Encrypt plug-in passwords.
 	if (defined($parameters->{'plugin_pass'})) {
@@ -3182,7 +3185,7 @@ sub pandora_evaluate_snmp_alerts ($$$$$$$$$) {
 		
 		# Specific SNMP Trap alert macros for regexp selectors in trap info
 		my %macros;
-		$macros{'_snmp_oid_'} = $trap_oid_text;
+		$macros{'_snmp_oid_'} = $trap_oid;
 		$macros{'_snmp_value_'} = $trap_value;
 		
 		# Custom OID/value
@@ -3807,6 +3810,11 @@ sub generate_status_event ($$$$$$$$) {
 		pandora_event ($pa_config, "Warmup mode for events ended.", 0, 0, 0, 0, 0, 'system', 0, $dbh);
 	}
 
+	# Disable events related to the unknown status.
+	if ($pa_config->{'unknown_events'} == 0 && ($last_status == 3 || $status == 3)) {
+		return;
+	}
+
 	# disable event just recovering from 'Unknown' without status change
 	if($last_status == 3 && $status == $last_known_status && $module->{'disabled_types_event'} ) {
 		my $disabled_types_event;
@@ -4225,6 +4233,13 @@ sub pandora_process_event_replication ($) {
 	logger($pa_config, "Starting replication events process.", 1);
 
 	while(1) { 
+
+		# If we are not the master server sleep and check again.
+		if (pandora_is_master($pa_config) == 0) {
+			sleep ($pa_config->{'server_threshold'});
+			next;
+		}
+
 		# Check the queue each N seconds
 		sleep ($replication_interval);
 		enterprise_hook('pandora_replicate_copy_events',[$pa_config, $dbh, $dbh_metaconsole, $metaconsole_server_id, $replication_mode]);
@@ -4249,6 +4264,13 @@ sub pandora_process_policy_queue ($) {
 	logger($pa_config, "Starting policy queue patrol process.", 1);
 
 	while(1) {
+
+		# If we are not the master server sleep and check again.
+		if (pandora_is_master($pa_config) == 0) {
+			sleep ($pa_config->{'server_threshold'});
+			next;
+		}
+
 		# Check the queue each 5 seconds
 		sleep (5);
 		
@@ -4371,7 +4393,7 @@ sub pandora_self_monitoring ($$) {
 
 	my $xml_output = "";
 	
-	$xml_output = "<agent_data os_name='Linux' os_version='".$pa_config->{'version'}."' agent_name='".$pa_config->{'servername'}."' interval='".$pa_config->{"self_monitoring_interval"}."' timestamp='".$timestamp."' >";
+	$xml_output = "<agent_data os_name='$OS' os_version='$OS_VERSION' version='" . $pa_config->{'version'} . "' description='Pandora FMS Server version " . $pa_config->{'version'} . "' agent_name='".$pa_config->{'servername'}."' interval='".$pa_config->{"self_monitoring_interval"}."' timestamp='".$timestamp."' >";
 	$xml_output .=" <module>";
 	$xml_output .=" <name>Status</name>";
 	$xml_output .=" <type>generic_proc</type>";
@@ -4587,8 +4609,11 @@ sub pandora_module_unknown ($$) {
 		        load_module_macros ($module->{'module_macros'}, \%macros);
 			$description = subst_alert_macros ($description, \%macros, $pa_config, $dbh, $agent, $module);
 
-			pandora_event ($pa_config, $description, $agent->{'id_grupo'}, $module->{'id_agente'},
-				$severity, 0, $module->{'id_agente_modulo'}, $event_type, 0, $dbh, 'Pandora', '', '', '', '', $module->{'critical_instructions'}, $module->{'warning_instructions'}, $module->{'unknown_instructions'});
+			# Are unknown events enabled?
+			if ($pa_config->{'unknown_events'} == 1) {
+				pandora_event ($pa_config, $description, $agent->{'id_grupo'}, $module->{'id_agente'},
+					$severity, 0, $module->{'id_agente_modulo'}, $event_type, 0, $dbh, 'Pandora', '', '', '', '', $module->{'critical_instructions'}, $module->{'warning_instructions'}, $module->{'unknown_instructions'});
+			}
 		}
 		# Regular module
 		else {
@@ -4614,8 +4639,12 @@ sub pandora_module_unknown ($$) {
 				logger($pa_config, "Alerts inhibited for agent '" . $agent->{'nombre'} . "'.", 10);
 			}
 			
-			my $do_event = 0;
-			if (!defined($module->{'disabled_types_event'}) || $module->{'disabled_types_event'} eq "") {
+			my $do_event;
+			# Are unknown events enabled?
+			if ($pa_config->{'unknown_events'} == 0) {
+				$do_event = 0;
+			}
+			elsif (!defined($module->{'disabled_types_event'}) || $module->{'disabled_types_event'} eq "") {
 				$do_event = 1;
 			}
 			else {

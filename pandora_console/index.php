@@ -295,20 +295,16 @@ if (! isset ($config['id_user'])) {
 			$nick_in_db = $_SESSION["prepared_login_da"]['id_user'];
 			$expired_pass = false;
 		}
-		else if (($config['auth'] == 'saml') && $login_button_saml) {
-			if (!is_user_admin($nick)) {
-				include_once(ENTERPRISE_DIR . "/include/auth/saml.php");
-				$saml_user_id = saml_process_user_login();
-				$nick_in_db = $saml_user_id;
-				if (!$nick_in_db) {
-					require_once('/opt/simplesamlphp/lib/_autoload.php');
-					$as = new SimpleSAML_Auth_Simple('PandoraFMS');
-					$as->logout();
-				}
-			}
-			else {
-				$config["auth_error"] = "Error - Cannot log in as admin with 'login with saml' button";
-				$nick_in_db = false;
+		else if (($config['auth'] == 'saml') && ($login_button_saml)) {
+			include_once(ENTERPRISE_DIR . "/include/auth/saml.php");
+			
+			$saml_user_id = saml_process_user_login();
+			
+			$nick_in_db = $saml_user_id;
+			if (!$nick_in_db) {
+				require_once($config['saml_path'] . 'simplesamlphp/lib/_autoload.php');
+				$as = new SimpleSAML_Auth_Simple('PandoraFMS');
+				$as->logout();
 			}
 		}
 		else {
@@ -379,7 +375,10 @@ if (! isset ($config['id_user'])) {
 			//login ok and password has not expired
 			$process_login = true;
 			
-			echo "<script type='text/javascript'>var process_login_ok = 1;</script>";
+			if (is_user_admin($nick))
+				echo "<script type='text/javascript'>var process_login_ok = 1;</script>";
+			else
+				echo "<script type='text/javascript'>var process_login_ok = 0;</script>";
 			
 			if (!isset($_GET["sec2"]) && !isset($_GET["sec"])) {
 				// Avoid the show homepage when the user go to
@@ -520,7 +519,7 @@ if (isset ($_GET["bye"])) {
 	unset($_SESSION['id_usuario']);
 	unset($iduser);
 	if ($config['auth'] == 'saml') {
-		require_once('/opt/simplesamlphp/lib/_autoload.php');
+		require_once($config['saml_path'] . 'simplesamlphp/lib/_autoload.php');
 		$as = new SimpleSAML_Auth_Simple('PandoraFMS');
 		$as->logout();
 	}
