@@ -26,6 +26,10 @@ if (!empty($address) || empty($id_agente)) {
 function ssh_gateway () {
 	
 	$SERVER_ADDR = $_SERVER['SERVER_ADDR'];
+	$SERVER_SSH_ADDR = $_SERVER['SERVER_SSH_ADDR'] || $SERVER_ADDR;
+	$SERVER_SSH_PORT = 8022;
+	$SERVER_TELNET_ADDR = $_SERVER['SERVER_TELNET_ADDR'] || $SERVER_ADDR;
+	$SERVER_TELNET_PORT = 8023;
 	
 	$HOST = get_parameter ("host", "");
 	$USER = get_parameter ("user", "");
@@ -86,11 +90,22 @@ function ssh_gateway () {
 			if ($PORT == 0)
 				$PORT = 22;
 		}
-		
+
+		$PROTO = "http";
+		if(isset ($_SERVER['HTTP_X_FORWARDED_PROTO'])
+			&& $_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https') {
+			$_SERVER['HTTPS'] = 'on';
+		}
+		if (isset ($_SERVER['HTTPS'])
+			&& ($_SERVER['HTTPS'] === true
+			|| $_SERVER['HTTPS'] == 'on')) {
+			$PROTO = "https";
+		}
+
 		if ($MODE == "ssh")
-			echo "<iframe style='border: 0px' src='http://".$SERVER_ADDR.":8022/anyterm.html?param=-p $PORT $USER@$HOST' width='100%' height=550>";
+			echo "<iframe style='border: 0px' src='$PROTO://$SERVER_SSH_ADDR:$SERVER_SSH_PORT/anyterm.html?param=-p $PORT $USER@$HOST' width='100%' height=550>";
 		else
-			echo "<iframe style='border: 0px' src='http://".$SERVER_ADDR.":8023/anyterm.html?param=$HOST $PORT' width='100%' height=550>";
+			echo "<iframe style='border: 0px' src='$PROTO://$SERVER_TELNET_ADDR:$SERVER_TELNET_PORT/anyterm.html?param=$HOST $PORT' width='100%' height=550>";
 		
 		echo "</iframe>";
 	}
